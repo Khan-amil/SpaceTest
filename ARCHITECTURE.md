@@ -18,6 +18,7 @@ The game is intentionally arranged as ES modules with one responsibility each:
 | `src/entities.js` | Entity factories and collision primitive | Game rules or rendering |
 | `src/waves.js` | Wave recipes, formation layouts, cadence, and clear rewards | Runtime state or enemy behavior |
 | `src/enemy-ai.js` | Archetype registry, formation targets, and enemy behavior transitions | DOM/canvas/audio |
+| `src/dive-paths.js` | Cubic Bézier evaluation, departure paths, exit clearance, and return geometry | State transitions or rendering |
 | `src/enemies/*-definition.js` | Immutable archetype health, rewards, dimensions, and motion data | Runtime state or drawing |
 | `src/enemies/scout.js`, `wasp.js`, `sentinel.js` | Original canvas silhouette drawing | Simulation rules |
 | `src/enemy-visuals.js` | Kind-to-drawing registry | Archetype balance |
@@ -68,9 +69,9 @@ and returning enemies never overwrite their home anchor or steer formation edges
 When every living enemy is away from formation, shared translation waits for re-entry.
 
 `enemy-ai.js` consumes immutable definitions and owns the explicit formation →
-telegraphingDive → diving → returning → formation sequence. The basic paths are
-time-parameterized sine curves; return interpolation targets the moving slot over
-0.7 seconds. Detailed Bézier paths remain Phase 3. Dead enemies enter `exploding`,
+telegraphingDive → diving → returning → formation sequence. Phase 3 replaces the
+initial sine paths with cubic Béziers; return curves target the current moving slot.
+Dead enemies enter `exploding`,
 clear path data, and are collision-disabled immediately; the renderer currently
 removes them without an explosion lifetime, leaving particles to Phase 6.
 
@@ -93,3 +94,35 @@ dispatch uses the `kind` registry and does not mutate enemies. The warning outli
 is steady in reduced-motion mode, and Sentinel shield damage changes its silhouette.
 Automated tests cover these rules. The final gate is a manual playtest recorded in
 [PHASE_2_PLAYTEST.md](PHASE_2_PLAYTEST.md).
+
+## Phase 3 dive geometry and fairness
+
+`dive-paths.js` evaluates cubic Béziers in the 960 × 640 design space. Scouts take
+a broad S-curve; Wasps use two equal-duration segments with a shared join tangent;
+Sentinels use a slower, deeper curve. Direction comes from the injected game RNG.
+Departure captures the player's X once, chooses an exit at least one player width
+away, and crosses below the field before returning. Curves never home on later
+player movement. Control points stay within the horizontal ship margins.
+
+Warnings last 0.45 / 0.60 / 0.50 seconds for Scout / Wasp / Sentinel. The existing
+pulsing outline stays steady with reduced motion. A warning waits through player
+invulnerability before departure. Telegraphs, dives, and returns all reserve a slot
+in the recipe's active-diver cap. Intro and pause remain frozen; destruction cancels
+the path immediately, including when clearing the final enemy.
+
+Wasps cap lateral acceleration at 1600 design pixels per second squared. The path
+builder uses the cubic's second-derivative bounds to lengthen its nominal 1.9-second
+duration where needed. Returns last 0.9 seconds (Scout/Wasp) or 1.1 seconds (Sentinel),
+use an upward control point, and ease into the current home with a zero final curve
+tangent. Formation movement and bob remain authoritative during re-entry.
+
+The player exposes actual velocity after movement clamps. A Wasp fires once per
+dive with 0.18 seconds of lead, a ±0.65-radian downward angle limit, a 340-pixel-per-
+second speed limit, and a one-second per-enemy cooldown. These settings live in
+its pure archetype definition. Cooldowns advance only during play and reset with
+new entities. Difficulty bands and general projectile budgets remain Phase 4.
+
+Automated coverage includes curve geometry, joined tangents/acceleration, edge exit
+clearance, warning protection, capacity across all stages, moving-home convergence,
+shot lead/cooldown, seeded events, collision cleanup, pause, and restart. See
+[PHASE_3_PLAYTEST.md](PHASE_3_PLAYTEST.md) for the browser smoke check and human gate.

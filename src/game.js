@@ -174,6 +174,8 @@ export class Game {
     const horizontalMargin = player.width / 2;
     const topBoundary = GAME_HEIGHT * 0.55;
     const bottomBoundary = GAME_HEIGHT - player.height / 2 - 14;
+    const previousX = player.x;
+    const previousY = player.y;
 
     player.x = Math.max(
       horizontalMargin,
@@ -184,6 +186,8 @@ export class Game {
       Math.min(bottomBoundary, player.y + verticalDirection * PlayerDefaults.speed * dt),
     );
     player.cooldown = Math.max(0, player.cooldown - dt);
+    player.velocityX = dt > 0 ? (player.x - previousX) / dt : 0;
+    player.velocityY = dt > 0 ? (player.y - previousY) / dt : 0;
     player.invulnerable = Math.max(0, player.invulnerable - dt);
 
     if (input.isDown('fire') && player.cooldown === 0) this.firePlayerProjectile();
@@ -218,7 +222,8 @@ export class Game {
     this.formation.elapsed += dt;
 
     for (const enemy of livingEnemies) {
-      const action = updateEnemyBehavior(enemy, this.formation, dt);
+      enemy.aimedShotCooldown = Math.max(0, enemy.aimedShotCooldown - dt);
+      const action = updateEnemyBehavior(enemy, this.formation, dt, this.player);
 
       if (action === 'started') this.emit(GameEvent.ENEMY_DIVE_STARTED, { enemy });
       if (action === 'ended') this.emit(GameEvent.ENEMY_DIVE_ENDED, { enemy });
@@ -281,15 +286,25 @@ export class Game {
   }
 
   fireAimedEnemyProjectile(enemy) {
-    const speed = this.waveDefinition.firing.projectileSpeed;
-    const horizontalDistance = this.player.x - enemy.x;
-    const verticalDistance = Math.max(80, this.player.y - enemy.y);
+    const attack = getEnemyDefinition(enemy.kind).dive;
+
+    if (this.state !== GameState.PLAYING || !enemy.alive || !attack.aimedShot) return false;
+    if (enemy.aimedShotCooldown > 0) return false;
+
+    const speed = Math.min(attack.maxShotSpeed, this.waveDefinition.firing.projectileSpeed);
+    const horizontalDistance = this.player.x + this.player.velocityX * attack.shotLead - enemy.x;
+    const verticalDistance = Math.max(80, this.player.y + this.player.velocityY * attack.shotLead - enemy.y);
     // A bounded downward angle gives the Wasp pressure without a horizontal surprise shot.
-    const angle = Math.max(-0.65, Math.min(0.65, Math.atan2(horizontalDistance, verticalDistance)));
+    const angle = Math.max(
+      -attack.maxShotAngle,
+      Math.min(attack.maxShotAngle, Math.atan2(horizontalDistance, verticalDistance)),
+    );
     const projectile = createProjectile(enemy.x, enemy.y + 23, Math.cos(angle) * speed, 'enemy');
 
     projectile.velocityX = Math.sin(angle) * speed;
     this.projectiles.push(projectile);
+    enemy.aimedShotCooldown = attack.shotCooldown;
+    return true;
   }
 
   updateProjectiles(dt) {

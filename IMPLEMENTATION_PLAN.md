@@ -152,6 +152,12 @@ Use cubic Bézier curves rather than per-frame hand-authored `sin` additions. Gi
 
 **Tests:** curve starts/ends at expected points; active dives never exceed configured cap; a telegraph always precedes a dive; return converges to the moving home slot; seeded RNG produces equal event sequences.
 
+**Implementation status:** implemented. Cubic paths, joined Wasp curves with bounded
+lateral acceleration, archetype warning durations, safe sampled exits, moving-slot
+returns, and bounded velocity-led shots are covered by deterministic tests. Browser
+smoke checks passed; full-session human fairness playtesting remains pending. See
+[PHASE_3_PLAYTEST.md](PHASE_3_PLAYTEST.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Phase 4 — turn waves into a deliberate difficulty curve
 
 **Outcome:** Difficulty climbs through one new pressure at a time, rather than merely making every value larger.

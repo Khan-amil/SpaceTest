@@ -13,6 +13,8 @@ export const createPlayer = () => ({
   lives: PlayerDefaults.maxLives,
   cooldown: 0,
   invulnerable: 0,
+  velocityX: 0,
+  velocityY: 0,
 });
 
 export function createEnemy(x, y, row, kind = 'scout') {
@@ -31,6 +33,7 @@ export function createEnemy(x, y, row, kind = 'scout') {
     home: { x, y },
     formationOffset: { x: 0, y: 0 },
     dive: null,
+    aimedShotCooldown: 0,
     health: definition.health,
     value: definition.value,
     alive: true,

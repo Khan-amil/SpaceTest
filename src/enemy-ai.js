@@ -1,6 +1,7 @@
 import { scoutDefinition } from './enemies/scout-definition.js';
 import { waspDefinition } from './enemies/wasp-definition.js';
 import { sentinelDefinition } from './enemies/sentinel-definition.js';
+import { createDivePath, evaluateDivePath, evaluateReturnPath } from './dive-paths.js';
 
 export const EnemyBehavior = Object.freeze({
   FORMATION: 'formation',
@@ -50,6 +51,7 @@ export function beginEnemyDive(enemy, direction) {
     elapsed: 0,
     direction,
     start: null,
+    path: null,
     returnStart: null,
     shotFired: false,
   };
@@ -57,8 +59,7 @@ export function beginEnemyDive(enemy, direction) {
   return true;
 }
 
-/** Basic time-parameterized paths; Phase 3 replaces these with authored Bézier segments. */
-export function updateEnemyBehavior(enemy, formation, dt) {
+export function updateEnemyBehavior(enemy, formation, dt, player = null) {
   if (!enemy.alive || enemy.behavior === EnemyBehavior.EXPLODING) return null;
 
   const homePosition = getFormationPosition(enemy, formation);
@@ -72,23 +73,25 @@ export function updateEnemyBehavior(enemy, formation, dt) {
 
     enemy.dive.elapsed += dt;
 
-    if (enemy.dive.elapsed < 0.45) return null;
+    if (enemy.dive.elapsed < definition.dive.telegraphDuration) return null;
+    // A warning already underway waits through respawn protection before departing.
+    if (player?.invulnerable > 0) return null;
 
     enemy.behavior = EnemyBehavior.DIVING;
     enemy.dive.elapsed = 0;
     enemy.dive.start = { x: enemy.x, y: enemy.y };
+    enemy.dive.path = createDivePath(enemy, definition.dive, enemy.dive.direction, player);
     return 'started';
   }
 
   enemy.dive.elapsed += dt;
 
   if (enemy.behavior === EnemyBehavior.DIVING) {
-    const progress = Math.min(1, enemy.dive.elapsed / definition.dive.duration);
-    const lateralTravel = Math.sin(progress * Math.PI * 2 * definition.dive.cycles)
-      * definition.dive.lateralWidth * enemy.dive.direction;
+    const progress = Math.min(1, enemy.dive.elapsed / enemy.dive.path.duration);
+    const position = evaluateDivePath(enemy.dive.path, progress);
 
-    enemy.x = enemy.dive.start.x + lateralTravel;
-    enemy.y = enemy.dive.start.y + Math.sin(progress * Math.PI) * definition.dive.depth;
+    enemy.x = position.x;
+    enemy.y = position.y;
 
     if (progress === 1) {
       enemy.behavior = EnemyBehavior.RETURNING;
@@ -107,12 +110,12 @@ export function updateEnemyBehavior(enemy, formation, dt) {
 
   if (enemy.behavior === EnemyBehavior.RETURNING) {
     // Interpolate toward the current slot, never the historical position at dive start.
-    const progress = Math.min(1, enemy.dive.elapsed / 0.7);
-    const easedProgress = progress * progress * (3 - 2 * progress);
+    const progress = Math.min(1, enemy.dive.elapsed / definition.dive.returnDuration);
     const start = enemy.dive.returnStart;
+    const position = evaluateReturnPath(start, homePosition, progress);
 
-    enemy.x = start.x + (homePosition.x - start.x) * easedProgress;
-    enemy.y = start.y + (homePosition.y - start.y) * easedProgress;
+    enemy.x = position.x;
+    enemy.y = position.y;
 
     if (progress === 1) {
       enemy.behavior = EnemyBehavior.FORMATION;

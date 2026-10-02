@@ -2,7 +2,9 @@ const sentinelDive = Object.freeze({
   duration: 3.3,
   depth: 480,
   lateralWidth: 160,
-  cycles: 1,
+  segments: 1,
+  telegraphDuration: 0.5,
+  returnDuration: 1.1,
   aimedShot: false,
   cadenceWeight: 0.25,
 });

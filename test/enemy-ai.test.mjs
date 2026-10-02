@@ -124,7 +124,7 @@ test('dive scheduling respects intro, invulnerability, active cap, and pause', (
   assert.equal(game.beginDive(first), false);
   assert.equal(game.beginDive(second), false);
   assert.equal(first.behavior, EnemyBehavior.TELEGRAPHING_DIVE);
-  advance(game, 0.44);
+  advance(game, enemyDefinitions[first.kind].dive.telegraphDuration - 0.02);
   assert.equal(first.behavior, EnemyBehavior.TELEGRAPHING_DIVE);
   advance(game, 0.03);
   assert.equal(first.behavior, EnemyBehavior.DIVING);
@@ -215,7 +215,7 @@ test('killing the final diver clears once and cannot produce delayed behavior', 
 
   game.enemies = [wasp];
   game.beginDive(wasp);
-  advance(game, 0.5);
+  advance(game, 0.65);
   assert.equal(wasp.behavior, EnemyBehavior.DIVING);
   game.consumeEvents();
   game.projectiles = [createProjectile(wasp.x, wasp.y, 0, 'player')];
