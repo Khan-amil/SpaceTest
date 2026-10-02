@@ -25,16 +25,16 @@ The game is intentionally arranged as ES modules with one responsibility each:
 
 ## Current vertical slice
 
-- Title, play, and game-over states with a real restart path.
-- WASD/arrow movement and held-space firing.
-- Enemy grid movement, basic hostile fire, projectile collision, score, lives, and scaled wave speed/fire rate.
-- Responsive, canvas-based arcade presentation and semantic HTML controls.
+- Title, play, pause, and game-over states with real restart/resume paths.
+- WASD/arrow movement, held-space firing, Enter confirmation, Escape pause, and an M-key sound preference toggle.
+- Enemy grid movement, hostile fire, projectile and direct-contact collision, score, three lives, invulnerability feedback, and scaled wave speed/fire rate.
+- Responsive, canvas-based arcade presentation with semantic controls, live status announcements, and a reduced-motion mode.
 
 ## Recommended next ownership slices
 
 1. **Gameplay/balance:** enrich enemy behavior, wave recipes, pickups, and score tuning in `game.js`/new modules; retain the `Game` UI-free boundary.
 2. **Presentation:** particles, animation, sound, sprites, and effects subscribe to `Game.consumeEvents()`; keep `renderer.js` presentation-only.
-3. **UI/accessibility:** pause, reduced-motion behavior, touch controls, and high-score persistence belong around `main.js` and `index.html`.
+3. **UI/accessibility:** touch controls and high-score persistence belong around `main.js` and `index.html`; retain the existing pause, live-region, and reduced-motion behavior.
 4. **QA:** add focused state-model tests in `test/`. Prefer simulation inputs over canvas assertions.
 
 ## Collaboration guardrails

@@ -9,12 +9,15 @@
   </head>
   <body>
     <main class="game-shell" aria-label="Space Attack arcade game">
-      <canvas id="game-canvas" width="960" height="640" aria-label="Game field"></canvas>
+      <canvas id="game-canvas" width="960" height="640" tabindex="-1" aria-label="Game field" aria-describedby="controls-description"></canvas>
+      <p id="controls-description" class="sr-only">Move with WASD or arrow keys. Fire with Space. Press Escape to pause and M to mute sound.</p>
+      <p id="game-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 
       <header class="hud" aria-live="polite">
         <div><span class="hud-label">Score</span><strong id="score">000000</strong></div>
         <div><span class="hud-label">Wave</span><strong id="wave">01</strong></div>
-        <div><span class="hud-label">Hull</span><strong id="lives">♥ ♥ ♥</strong></div>
+        <div><span class="hud-label">Hull</span><strong id="lives">3 / 3</strong></div>
+        <button id="mute-button" class="hud-button" type="button" aria-pressed="false">Sound: on</button>
       </header>
 
       <section id="start-screen" class="overlay">
@@ -22,7 +25,14 @@
         <h1>SPACE <span>ATTACK</span></h1>
         <p class="lead">Defend the frontier. Survive the swarm.</p>
         <button id="start-button" class="action-button" type="button">Launch mission</button>
-        <p class="controls"><kbd>WASD</kbd> / <kbd>ARROWS</kbd> move &nbsp; <kbd>SPACE</kbd> fire</p>
+        <p class="controls"><kbd>WASD</kbd> / <kbd>ARROWS</kbd> move &nbsp; <kbd>SPACE</kbd> fire<br><kbd>ESC</kbd> pause &nbsp; <kbd>M</kbd> sound &nbsp; <kbd>ENTER</kbd> launch</p>
+      </section>
+
+      <section id="pause-screen" class="overlay is-hidden" aria-labelledby="pause-title">
+        <p class="eyebrow">SYSTEMS HOLD</p>
+        <h2 id="pause-title">PAUSED</h2>
+        <button id="resume-button" class="action-button" type="button">Resume mission</button>
+        <p class="controls">Press <kbd>ESC</kbd> or <kbd>ENTER</kbd> to resume</p>
       </section>
 
       <section id="game-over-screen" class="overlay is-hidden" aria-live="assertive">

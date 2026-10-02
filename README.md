@@ -6,6 +6,8 @@ Open `index.html` through a static server, or publish the repository root with G
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for subsystem boundaries, current capabilities, and handoff guidance.
 
+For the complete feature roadmap, behavior model, and quality gates, see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
 ## Deploy to GitHub Pages
 
 This repository includes a GitHub Actions workflow that tests and publishes the game whenever `main` is updated.
