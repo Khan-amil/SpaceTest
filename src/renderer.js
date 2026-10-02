@@ -1,0 +1,12 @@
+import { GAME_HEIGHT, GAME_WIDTH } from './constants.js';
+
+/** Canvas-only presentation layer. Game balance and collision data stay in game.js/entities.js. */
+export class Renderer {
+  constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.stars = this.createStars(); }
+  createStars() { return Array.from({ length: 110 }, (_, i) => ({ x: (i * 137) % GAME_WIDTH, y: (i * 71) % GAME_HEIGHT, size: 1 + (i % 3), speed: 8 + (i % 5) * 7 })); }
+  render(game, time) { const c = this.ctx; c.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT); this.background(c, time); game.projectiles.forEach((b) => this.projectile(c, b)); game.enemies.filter((e) => e.alive).forEach((e) => this.enemy(c, e)); this.player(c, game.player); }
+  background(c, time) { c.fillStyle = '#030918'; c.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); const glow = c.createRadialGradient(480, 170, 0, 480, 170, 620); glow.addColorStop(0, '#15386799'); glow.addColorStop(1, '#03091800'); c.fillStyle = glow; c.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); c.fillStyle = '#d7f9ff'; for (const star of this.stars) { const y = (star.y + time * star.speed) % GAME_HEIGHT; c.globalAlpha = .25 + star.size * .2; c.fillRect(star.x, y, star.size, star.size); } c.globalAlpha = 1; }
+  player(c, p) { c.save(); c.translate(p.x, p.y); c.globalAlpha = p.invulnerable > 0 && Math.floor(p.invulnerable * 12) % 2 ? .35 : 1; c.shadowColor = '#2eeaff'; c.shadowBlur = 18; c.fillStyle = '#66eaff'; c.beginPath(); c.moveTo(0, -25); c.lineTo(19, 20); c.lineTo(0, 13); c.lineTo(-19, 20); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = '#eafcff'; c.beginPath(); c.moveTo(0, -15); c.lineTo(6, 8); c.lineTo(-6, 8); c.closePath(); c.fill(); c.fillStyle = '#ff926b'; c.fillRect(-12, 18, 7, 13); c.fillRect(5, 18, 7, 13); c.restore(); }
+  enemy(c, e) { c.save(); c.translate(e.x, e.y); c.shadowColor = '#ff3f71'; c.shadowBlur = 12; c.fillStyle = e.row === 0 ? '#ff6e94' : '#c64670'; c.beginPath(); c.moveTo(-19, -10); c.lineTo(-8, -15); c.lineTo(8, -15); c.lineTo(19, -10); c.lineTo(14, 12); c.lineTo(-14, 12); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = '#ffd6e0'; c.fillRect(-9, -4, 5, 4); c.fillRect(4, -4, 5, 4); c.restore(); }
+  projectile(c, b) { c.save(); c.shadowColor = b.owner === 'player' ? '#55eaff' : '#ff537b'; c.shadowBlur = 12; c.fillStyle = b.owner === 'player' ? '#b9fbff' : '#ff84a2'; c.fillRect(b.x - b.width / 2, b.y - b.height / 2, b.width, b.height); c.restore(); }
+}

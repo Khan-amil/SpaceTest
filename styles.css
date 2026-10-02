@@ -1,0 +1,22 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #020711; }
+* { box-sizing: border-box; }
+body { min-width: 320px; min-height: 100vh; margin: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 15%, #102b59 0%, #061126 33%, #020711 80%); }
+.game-shell { position: relative; width: min(960px, 100vw); overflow: hidden; aspect-ratio: 3 / 2; box-shadow: 0 25px 90px #000a, inset 0 0 0 1px #6bdcff44; background: #030919; }
+canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
+.hud { position: absolute; z-index: 1; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 22px 28px; pointer-events: none; color: #dffbff; text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 12px #24d9ff; }
+.hud div { display: grid; gap: 2px; }
+.hud div:nth-child(2) { text-align: center; }
+.hud div:last-child { text-align: right; color: #ff7b9c; }
+.hud-label { font-size: clamp(.55rem, 1.4vw, .72rem); opacity: .75; }
+.hud strong { font-size: clamp(.85rem, 2vw, 1.2rem); }
+.overlay { position: absolute; inset: 0; display: grid; justify-items: center; align-content: center; padding: 5rem 1.5rem 2rem; text-align: center; background: linear-gradient(#06112677, #030713dd); transition: opacity .25s, visibility .25s; }
+.overlay.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.eyebrow { margin: 0 0 .8rem; color: #73e7ff; font-size: .72rem; font-weight: 800; letter-spacing: .2em; }
+h1, h2 { margin: 0; color: #fff; font-style: italic; line-height: .9; letter-spacing: .055em; text-shadow: 0 0 24px #2788ff; }
+h1 { font-size: clamp(2.4rem, 9vw, 5.4rem); } h1 span { color: #ff4f7d; }
+h2 { font-size: clamp(2.4rem, 7vw, 4.3rem); color: #ff668c; }
+.lead { margin: 1.1rem 0 1.8rem; color: #c9d9ed; }
+.action-button { min-width: 180px; padding: .85rem 1.4rem; border: 1px solid #73e7ff; border-radius: 3px; background: #0e5d8e; color: white; font: 800 .9rem inherit; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 18px #21bff788; transition: transform .15s, background .15s; }
+.action-button:hover, .action-button:focus-visible { transform: translateY(-2px); background: #147ab6; outline: 2px solid white; outline-offset: 3px; }
+.controls { margin: 1.65rem 0 0; color: #93acc8; font-size: clamp(.62rem, 1.7vw, .78rem); } kbd { padding: .18em .42em; border: 1px solid #81a4cd99; border-radius: 3px; color: #e9f8ff; font-family: inherit; font-size: .9em; }
+@media (max-width: 520px) { .hud { padding: 15px; } .hud div:last-child { max-width: 95px; line-height: 1.15; } }

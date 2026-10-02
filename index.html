@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#061126" />
+    <title>Space Attack</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Space Attack arcade game">
+      <canvas id="game-canvas" width="960" height="640" aria-label="Game field"></canvas>
+
+      <header class="hud" aria-live="polite">
+        <div><span class="hud-label">Score</span><strong id="score">000000</strong></div>
+        <div><span class="hud-label">Wave</span><strong id="wave">01</strong></div>
+        <div><span class="hud-label">Hull</span><strong id="lives">♥ ♥ ♥</strong></div>
+      </header>
+
+      <section id="start-screen" class="overlay">
+        <p class="eyebrow">ARCADE COMMAND // 2087</p>
+        <h1>SPACE <span>ATTACK</span></h1>
+        <p class="lead">Defend the frontier. Survive the swarm.</p>
+        <button id="start-button" class="action-button" type="button">Launch mission</button>
+        <p class="controls"><kbd>WASD</kbd> / <kbd>ARROWS</kbd> move &nbsp; <kbd>SPACE</kbd> fire</p>
+      </section>
+
+      <section id="game-over-screen" class="overlay is-hidden" aria-live="assertive">
+        <p class="eyebrow">MISSION TERMINATED</p>
+        <h2>GAME OVER</h2>
+        <p id="final-score" class="lead">Final score: 0</p>
+        <button id="restart-button" class="action-button" type="button">Fly again</button>
+        <p class="controls">Press <kbd>ENTER</kbd> to restart</p>
+      </section>
+    </main>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
