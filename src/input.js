@@ -23,9 +23,10 @@ export class InputController {
       const action = KEY_ACTIONS[event.code];
 
       if (!action) return;
+      if (isNativeButtonActivation(event, action)) return;
 
       // Repeated keydown events keep a movement action held but do not retrigger commands.
-      if (!this.down.has(action)) this.pressed.add(action);
+      if (!event.repeat && !this.down.has(action)) this.pressed.add(action);
 
       this.down.add(action);
       event.preventDefault();
@@ -35,6 +36,7 @@ export class InputController {
       const action = KEY_ACTIONS[event.code];
 
       if (!action) return;
+      if (isNativeButtonActivation(event, action)) return;
 
       this.down.delete(action);
       event.preventDefault();
@@ -59,4 +61,12 @@ export class InputController {
     this.down.clear();
     this.pressed.clear();
   }
+}
+
+function isNativeButtonActivation(event, action) {
+  // Let focused semantic controls receive Enter/Space through the browser's native click.
+  const activatesControl = action === 'confirm' || action === 'fire';
+  const isButton = Boolean(event.target?.closest?.('button'));
+
+  return activatesControl && isButton;
 }

@@ -3,6 +3,7 @@ export const GAME_HEIGHT = 640;
 
 export const GameState = Object.freeze({
   TITLE: 'title',
+  WAVE_INTRO: 'waveIntro',
   PLAYING: 'playing',
   PAUSED: 'paused',
   GAME_OVER: 'gameOver',
@@ -27,6 +28,8 @@ export const WaveDefaults = Object.freeze({
   baseSpeed: 32,
   dropDistance: 22,
   fireInterval: 1.15,
+  introDuration: 1.25,
+  clearDuration: 0.7,
 });
 
 /** The game-session contract. A future continue system must explicitly revise this rule. */

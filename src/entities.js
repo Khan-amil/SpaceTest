@@ -14,7 +14,7 @@ export const createPlayer = () => ({
   invulnerable: 0,
 });
 
-export const createEnemy = (x, y, row) => ({
+export const createEnemy = (x, y, row, kind = 'scout') => ({
   id: nextEntityId++,
   type: 'enemy',
   x,
@@ -22,6 +22,7 @@ export const createEnemy = (x, y, row) => ({
   width: 38,
   height: 28,
   row,
+  kind,
   alive: true,
 });
 

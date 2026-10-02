@@ -2,6 +2,7 @@ import { GameEvent, GameState } from './constants.js';
 import { Game } from './game.js';
 import { InputController } from './input.js';
 import { Renderer } from './renderer.js';
+import { createPreferencesStore } from './storage.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -17,8 +18,15 @@ const elements = {
   lives: document.querySelector('#lives'),
   startScreen: document.querySelector('#start-screen'),
   pauseScreen: document.querySelector('#pause-screen'),
+  waveIntroScreen: document.querySelector('#wave-intro-screen'),
+  waveIntroTitle: document.querySelector('#wave-intro-title'),
+  waveIntroDescription: document.querySelector('#wave-intro-description'),
   gameOverScreen: document.querySelector('#game-over-screen'),
   finalScore: document.querySelector('#final-score'),
+  finalWave: document.querySelector('#final-wave'),
+  finalDestroyed: document.querySelector('#final-destroyed'),
+  finalAccuracy: document.querySelector('#final-accuracy'),
+  bestScore: document.querySelector('#best-score'),
   muteButton: document.querySelector('#mute-button'),
   status: document.querySelector('#game-status'),
 };
@@ -27,7 +35,11 @@ const startButton = document.querySelector('#start-button');
 const resumeButton = document.querySelector('#resume-button');
 const restartButton = document.querySelector('#restart-button');
 
-let muted = false;
+const preferencesStore = createPreferencesStore(() => window.localStorage);
+const savedPreferences = preferencesStore.load();
+
+let muted = savedPreferences.muted;
+let bestScore = savedPreferences.bestScore;
 
 const FIXED_STEP = 1 / 120;
 const MAX_FRAME_DURATION = 0.1;
@@ -62,20 +74,31 @@ function resumeMission() {
 function toggleMute() {
   muted = !muted;
 
+  syncMuteButton();
+  preferencesStore.saveMuted(muted);
+  announce(`Sound ${muted ? 'muted' : 'enabled'}.`);
+}
+
+function syncMuteButton() {
   elements.muteButton.setAttribute('aria-pressed', String(muted));
   elements.muteButton.textContent = `Sound: ${muted ? 'off' : 'on'}`;
-  announce(`Sound ${muted ? 'muted' : 'enabled'}.`);
 }
 
 function handleCommands() {
   if (input.consumePressed('mute')) toggleMute();
 
   if (input.consumePressed('pause')) {
+    const previousState = game.state;
     game.togglePause();
 
     if (game.state === GameState.PAUSED) {
+      input.clear();
+      syncUi();
+      resumeButton.focus();
       announce('Game paused. Press Escape or Enter to resume.');
-    } else if (game.state === GameState.PLAYING) {
+    } else if (previousState === GameState.PAUSED) {
+      input.clear();
+      focusGameField();
       announce('Mission resumed.');
     }
   }
@@ -95,12 +118,20 @@ function consumeGameEvents() {
       announce(`Wave ${event.wave}. Clear all enemies to advance.`);
     }
 
+    if (event.type === GameEvent.WAVE_CLEARED) {
+      announce(`Wave ${event.wave} cleared. Bonus ${event.bonus} points.`);
+    }
+
     if (event.type === GameEvent.PLAYER_DAMAGED) {
       announce(`Hull hit. ${event.lives} lives remaining.`);
     }
 
     if (event.type === GameEvent.GAME_OVER) {
-      announce(`Game over. Final score ${event.score}. Press Enter to restart.`);
+      preferencesStore.saveBestScore(event.score);
+      bestScore = preferencesStore.load().bestScore;
+      announce(`Game over. Score ${event.score}. Wave ${event.waveReached}. Press Enter to restart.`);
+      syncUi();
+      restartButton.focus();
     }
   }
 }
@@ -112,10 +143,26 @@ function syncUi() {
 
   elements.startScreen.classList.toggle('is-hidden', game.state !== GameState.TITLE);
   elements.pauseScreen.classList.toggle('is-hidden', game.state !== GameState.PAUSED);
+  elements.waveIntroScreen.classList.toggle('is-hidden', game.state !== GameState.WAVE_INTRO);
   elements.gameOverScreen.classList.toggle('is-hidden', game.state !== GameState.GAME_OVER);
 
+  if (game.state === GameState.WAVE_INTRO) {
+    const isClearTransition = game.waveIntro?.phase === 'cleared';
+
+    elements.waveIntroTitle.textContent = isClearTransition ? 'SECTOR CLEAR' : `WAVE ${game.wave}`;
+    elements.waveIntroDescription.textContent = isClearTransition
+      ? `Clear bonus: +${game.waveIntro.bonus}. Preparing wave ${game.pendingWave}.`
+      : 'Prepare to engage.';
+  }
+
   if (game.state === GameState.GAME_OVER) {
-    elements.finalScore.textContent = `Final score: ${game.score}`;
+    const summary = game.gameOverSummary;
+
+    elements.finalScore.textContent = String(summary.score).padStart(6, '0');
+    elements.finalWave.textContent = String(summary.waveReached);
+    elements.finalDestroyed.textContent = String(summary.enemiesDestroyed);
+    elements.finalAccuracy.textContent = `${summary.accuracy}%`;
+    elements.bestScore.textContent = String(bestScore).padStart(6, '0');
   }
 }
 
@@ -146,5 +193,6 @@ resumeButton.addEventListener('click', resumeMission);
 restartButton.addEventListener('click', startMission);
 elements.muteButton.addEventListener('click', toggleMute);
 
+syncMuteButton();
 syncUi();
 requestAnimationFrame(frame);

@@ -24,16 +24,16 @@
       </p>
       <p id="game-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 
-      <header class="hud" aria-live="polite">
-        <div>
+      <header class="hud">
+        <div class="hud-stat">
           <span class="hud-label">Score</span>
           <strong id="score">000000</strong>
         </div>
-        <div>
+        <div class="hud-stat hud-stat--wave">
           <span class="hud-label">Wave</span>
           <strong id="wave">01</strong>
         </div>
-        <div>
+        <div class="hud-stat hud-stat--hull">
           <span class="hud-label">Hull</span>
           <strong id="lives">3 / 3</strong>
         </div>
@@ -66,10 +66,41 @@
         </p>
       </section>
 
-      <section id="game-over-screen" class="overlay is-hidden" aria-live="assertive">
+      <section
+        id="wave-intro-screen"
+        class="overlay overlay--notice is-hidden"
+        aria-labelledby="wave-intro-title"
+      >
+        <p class="eyebrow">LONG-RANGE SCAN</p>
+        <h2 id="wave-intro-title">WAVE 1</h2>
+        <p id="wave-intro-description" class="lead">Prepare to engage.</p>
+      </section>
+
+      <section id="game-over-screen" class="overlay overlay--summary is-hidden" aria-labelledby="game-over-title">
         <p class="eyebrow">MISSION TERMINATED</p>
-        <h2>GAME OVER</h2>
-        <p id="final-score" class="lead">Final score: 0</p>
+        <h2 id="game-over-title">GAME OVER</h2>
+        <dl class="summary-list">
+          <div>
+            <dt>Score</dt>
+            <dd id="final-score">000000</dd>
+          </div>
+          <div>
+            <dt>Wave reached</dt>
+            <dd id="final-wave">1</dd>
+          </div>
+          <div>
+            <dt>Enemies destroyed</dt>
+            <dd id="final-destroyed">0</dd>
+          </div>
+          <div>
+            <dt>Accuracy</dt>
+            <dd id="final-accuracy">0%</dd>
+          </div>
+          <div>
+            <dt>Best score</dt>
+            <dd id="best-score">000000</dd>
+          </div>
+        </dl>
         <button id="restart-button" class="action-button" type="button">
           Fly again
         </button>

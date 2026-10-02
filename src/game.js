@@ -8,22 +8,36 @@ import {
   WaveDefaults,
 } from './constants.js';
 import { createEnemy, createPlayer, createProjectile, overlaps } from './entities.js';
+import { getEnemyKindForRow, getWaveDefinition } from './waves.js';
 
 /**
  * Deterministic gameplay model. It owns mutable game state but knows nothing about DOM,
  * rendering, audio, or keyboard events. New systems should subscribe through `events`.
  */
 export class Game {
-  constructor(random = Math.random) {
+  constructor(random = Math.random, waveDefinitionFactory = getWaveDefinition) {
     this.random = random;
-    this.events = [];
+    this.waveDefinitionFactory = waveDefinitionFactory;
     this.reset();
   }
 
   reset() {
+    this.events = [];
     this.state = GameState.TITLE;
+    this.stateBeforePause = null;
     this.score = 0;
     this.wave = 1;
+    this.waveDefinition = null;
+    this.waveIntro = null;
+    this.pendingWave = null;
+    this.waveClearStarted = false;
+    this.gameOverSummary = null;
+    this.statistics = {
+      shotsFired: 0,
+      shotsHit: 0,
+      enemiesDestroyed: 0,
+      waveReached: this.wave,
+    };
     this.player = createPlayer();
     this.enemies = [];
     this.projectiles = [];
@@ -33,9 +47,11 @@ export class Game {
   }
 
   start() {
+    if (this.state !== GameState.TITLE && this.state !== GameState.GAME_OVER) return;
+
     this.reset();
-    this.state = GameState.PLAYING;
     this.emit(GameEvent.GAME_STARTED);
+    this.beginWaveIntro();
   }
 
   restart() {
@@ -43,8 +59,9 @@ export class Game {
   }
 
   pause() {
-    if (this.state !== GameState.PLAYING) return;
+    if (this.state !== GameState.PLAYING && this.state !== GameState.WAVE_INTRO) return;
 
+    this.stateBeforePause = this.state;
     this.state = GameState.PAUSED;
     this.emit(GameEvent.GAME_PAUSED);
   }
@@ -52,13 +69,17 @@ export class Game {
   resume() {
     if (this.state !== GameState.PAUSED) return;
 
-    this.state = GameState.PLAYING;
+    this.state = this.stateBeforePause;
+    this.stateBeforePause = null;
     this.emit(GameEvent.GAME_RESUMED);
   }
 
   togglePause() {
-    if (this.state === GameState.PLAYING) this.pause();
-    else if (this.state === GameState.PAUSED) this.resume();
+    if (this.state === GameState.PAUSED) {
+      this.resume();
+    } else {
+      this.pause();
+    }
   }
 
   emit(type, detail = {}) {
@@ -72,24 +93,32 @@ export class Game {
   }
 
   spawnWave() {
-    const { columns, rows, spacingX, spacingY } = WaveDefaults;
+    this.waveDefinition = this.waveDefinitionFactory(this.wave);
+    const { columns, rows, spacingX, spacingY, startY } = this.waveDefinition.formation;
     const formationLeft = (GAME_WIDTH - (columns - 1) * spacingX) / 2;
 
     this.enemies = Array.from({ length: rows * columns }, (_, index) => {
       const row = Math.floor(index / columns);
       const column = index % columns;
       const x = formationLeft + column * spacingX;
-      const y = 105 + row * spacingY;
+      const y = startY + row * spacingY;
+      const kind = getEnemyKindForRow(this.waveDefinition.enemyMix, row);
 
-      return createEnemy(x, y, row);
+      return createEnemy(x, y, row, kind);
     });
 
     this.enemyDirection = 1;
-    this.enemyFireTimer = 0.65;
-    this.emit(GameEvent.WAVE_STARTED, { wave: this.wave });
+    this.enemyFireTimer = this.waveDefinition.firing.initialDelay;
+    this.waveClearStarted = false;
+    this.statistics.waveReached = Math.max(this.statistics.waveReached, this.wave);
   }
 
   update(dt, input) {
+    if (this.state === GameState.WAVE_INTRO) {
+      this.updateWaveIntro(dt);
+      return;
+    }
+
     if (this.state !== GameState.PLAYING) return;
 
     this.updatePlayer(dt, input);
@@ -98,6 +127,32 @@ export class Game {
     this.resolveCollisions();
     this.removeExpiredProjectiles();
     this.advanceWaveWhenCleared();
+  }
+
+  beginWaveIntro() {
+    this.state = GameState.WAVE_INTRO;
+    this.waveIntro = {
+      phase: 'incoming',
+      remaining: WaveDefaults.introDuration,
+    };
+    this.emit(GameEvent.WAVE_STARTED, { wave: this.wave });
+  }
+
+  updateWaveIntro(dt) {
+    this.waveIntro.remaining = Math.max(0, this.waveIntro.remaining - dt);
+
+    if (this.waveIntro.remaining > 0) return;
+
+    if (this.waveIntro.phase === 'cleared') {
+      this.wave = this.pendingWave;
+      this.pendingWave = null;
+      this.spawnWave();
+      this.beginWaveIntro();
+      return;
+    }
+
+    this.waveIntro = null;
+    this.state = GameState.PLAYING;
   }
 
   updatePlayer(dt, input) {
@@ -127,7 +182,7 @@ export class Game {
 
     if (!livingEnemies.length) return;
 
-    const formationSpeed = WaveDefaults.baseSpeed + (this.wave - 1) * 8;
+    const formationSpeed = this.waveDefinition.movement.speed;
     const formationEdge = 38;
     const reachesScreenEdge = livingEnemies.some((enemy) => {
       const nextX = enemy.x + this.enemyDirection * formationSpeed * dt;
@@ -137,7 +192,7 @@ export class Game {
     if (reachesScreenEdge) {
       this.enemyDirection *= -1;
       livingEnemies.forEach((enemy) => {
-        enemy.y += WaveDefaults.dropDistance;
+        enemy.y += this.waveDefinition.movement.dropDistance;
       });
     }
 
@@ -157,7 +212,11 @@ export class Game {
   }
 
   resolveCollisions() {
+    if (this.state !== GameState.PLAYING) return;
+
     for (const projectile of this.projectiles) {
+      // A fatal hit ends collision processing so the final summary cannot change afterward.
+      if (this.state !== GameState.PLAYING) break;
       if (!projectile.alive) continue;
 
       if (projectile.owner === 'player') {
@@ -167,35 +226,41 @@ export class Game {
       }
     }
 
-    this.resolveEnemyContactCollision();
+    if (this.state === GameState.PLAYING) this.resolveEnemyContactCollision();
   }
 
   firePlayerProjectile() {
+    if (this.state !== GameState.PLAYING) return;
+
     const player = this.player;
 
     this.projectiles.push(createProjectile(player.x, player.y - 31, -570, 'player'));
     player.cooldown = PlayerDefaults.fireInterval;
+    this.statistics.shotsFired += 1;
     this.emit(GameEvent.PLAYER_FIRED);
   }
 
   fireEnemyProjectile(livingEnemies) {
     const randomIndex = Math.floor(this.random() * livingEnemies.length);
     const shooter = livingEnemies[randomIndex];
-    const projectileSpeed = 260 + this.wave * 15;
-    const nextFireInterval = Math.max(0.35, WaveDefaults.fireInterval - this.wave * 0.07);
+    const { projectileSpeed, interval } = this.waveDefinition.firing;
 
     this.projectiles.push(createProjectile(shooter.x, shooter.y + 23, projectileSpeed, 'enemy'));
-    this.enemyFireTimer = nextFireInterval;
+    this.enemyFireTimer = interval;
   }
 
   resolvePlayerProjectileCollision(projectile) {
+    if (!projectile.alive) return;
+
     const hitEnemy = this.enemies.find((enemy) => enemy.alive && overlaps(projectile, enemy));
 
     if (!hitEnemy) return;
 
     hitEnemy.alive = false;
     projectile.alive = false;
-    this.score += 100 + (WaveDefaults.rows - hitEnemy.row) * 25;
+    this.score += 100 + (this.waveDefinition.formation.rows - hitEnemy.row) * 25;
+    this.statistics.shotsHit += 1;
+    this.statistics.enemiesDestroyed += 1;
     this.emit(GameEvent.ENEMY_DESTROYED, { enemy: hitEnemy, score: this.score });
   }
 
@@ -216,6 +281,7 @@ export class Game {
     if (!contactEnemy) return;
 
     contactEnemy.alive = false;
+    this.statistics.enemiesDestroyed += 1;
     this.emit(GameEvent.PLAYER_CONTACTED, { enemy: contactEnemy });
     this.damagePlayer('contact');
   }
@@ -233,17 +299,29 @@ export class Game {
   advanceWaveWhenCleared() {
     const waveIsCleared = !this.enemies.some((enemy) => enemy.alive);
 
-    if (this.state !== GameState.PLAYING || !waveIsCleared) return;
+    if (this.state !== GameState.PLAYING || !waveIsCleared || this.waveClearStarted) return;
 
-    this.emit(GameEvent.WAVE_CLEARED, { wave: this.wave });
+    this.waveClearStarted = true;
+    const bonus = this.waveDefinition.clearBonus;
+    this.score += bonus;
+    this.emit(GameEvent.WAVE_CLEARED, { wave: this.wave, bonus, score: this.score });
 
     if (!SessionRules.advancesOnWaveClear) return;
 
-    this.wave += 1;
-    this.spawnWave();
+    this.pendingWave = this.wave + 1;
+    // Old bullets must not carry frozen danger into a newly introduced formation.
+    this.projectiles = [];
+    this.waveIntro = {
+      phase: 'cleared',
+      bonus,
+      remaining: WaveDefaults.clearDuration,
+    };
+    this.state = GameState.WAVE_INTRO;
   }
 
   damagePlayer(source = 'projectile') {
+    if (this.state !== GameState.PLAYING || this.player.invulnerable > 0) return;
+
     this.player.lives -= 1;
     this.player.invulnerable = PlayerDefaults.invulnerability;
     this.emit(GameEvent.PLAYER_DAMAGED, { lives: this.player.lives, source });
@@ -255,6 +333,14 @@ export class Game {
     if (this.state !== GameState.PLAYING) return;
 
     this.state = GameState.GAME_OVER;
-    this.emit(GameEvent.GAME_OVER, { score: this.score });
+    this.gameOverSummary = Object.freeze({
+      score: this.score,
+      waveReached: this.statistics.waveReached,
+      enemiesDestroyed: this.statistics.enemiesDestroyed,
+      accuracy: this.statistics.shotsFired === 0
+        ? 0
+        : Math.round((this.statistics.shotsHit / this.statistics.shotsFired) * 100),
+    });
+    this.emit(GameEvent.GAME_OVER, { ...this.gameOverSummary });
   }
 }

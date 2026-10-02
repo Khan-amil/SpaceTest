@@ -77,6 +77,8 @@ Create a module only once its existing owner has two clearly independent respons
 
 **Tests:** state transitions cannot skip from title to game over; pause prevents movement/cooldowns; a cleared wave gives one bonus and advances once; restart resets temporary effects but preserves high score.
 
+**Implementation status:** implemented; manual playtest gate pending. See [PHASE_1_PLAYTEST.md](PHASE_1_PLAYTEST.md) for acceptance checks and [ARCHITECTURE.md](ARCHITECTURE.md) for lifecycle and configuration details. The recipe's dive cadence is explicitly disabled until the later enemy behavior phases.
+
 ## Phase 2 — make enemy behavior extensible
 
 **Outcome:** Enemies use explicit behavior states, allowing formation breakers without fragile one-off motion code.
@@ -249,4 +251,3 @@ Each item should be a small pull request with its tests and a playable browser c
 - [ ] Handles reset/restart, wave clear, game over, and pause where applicable.
 - [ ] Has a manual playtest note describing the observed behavior.
 - [ ] Keeps the static Pages artifact free of development-only files and dependencies.
-

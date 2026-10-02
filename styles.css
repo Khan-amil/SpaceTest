@@ -62,12 +62,12 @@ canvas {
   text-transform: uppercase;
 }
 
-.hud div {
+.hud-stat {
   display: grid;
   gap: 2px;
 }
 
-.hud div:nth-child(2) {
+.hud-stat--wave {
   text-align: center;
 }
 
@@ -93,13 +93,21 @@ canvas {
   padding: 5rem 1.5rem 2rem;
   text-align: center;
   background: linear-gradient(#06112677, #030713dd);
-  transition: opacity 0.25s, visibility 0.25s;
+  /* Visibility changes immediately so newly shown resume/restart controls can take focus. */
+  transition: opacity 0.25s;
 }
 
 .overlay.is-hidden {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+}
+
+/* The wave notice keeps the game field visible while the simulation is safely frozen. */
+.overlay--notice {
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(#06112699, #030713aa);
 }
 
 .eyebrow {
@@ -136,6 +144,34 @@ h2 {
 .lead {
   margin: 1.1rem 0 1.8rem;
   color: #c9d9ed;
+}
+
+.summary-list {
+  display: grid;
+  gap: 0.55rem;
+  width: min(370px, 100%);
+  margin: 1.2rem 0 1.8rem;
+  color: #c9d9ed;
+  text-align: left;
+}
+
+.summary-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.summary-list dt {
+  color: #93acc8;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.summary-list dd {
+  margin: 0;
+  color: #fff;
+  font-weight: 800;
 }
 
 .controls {
@@ -220,18 +256,6 @@ kbd {
   border: 0;
 }
 
-/* Avoid decorative movement and abrupt transitions for motion-sensitive players. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
-
 /* -------------------------------------------------------------------------- */
 /* Responsive layout                                                          */
 /* -------------------------------------------------------------------------- */
@@ -241,9 +265,55 @@ kbd {
     padding: 15px;
   }
 
-  .hud div:nth-child(3) {
+  .hud-stat--hull {
     max-width: 95px;
     line-height: 1.15;
     text-align: right;
+  }
+
+  /* Five summary rows and the restart control must fit inside the scaled game field. */
+  .overlay--summary {
+    padding: 2.9rem 1rem 0.35rem;
+  }
+
+  .overlay--summary .eyebrow {
+    display: none;
+  }
+
+  .overlay--summary h2 {
+    font-size: clamp(1.4rem, 6vw, 2.4rem);
+  }
+
+  .summary-list {
+    gap: 0.12rem;
+    width: min(300px, 100%);
+    margin: 0.5rem 0;
+  }
+
+  .summary-list dt,
+  .summary-list dd {
+    font-size: 0.65rem;
+  }
+
+  .overlay--summary .action-button {
+    min-width: 150px;
+    padding: 0.45rem 1rem;
+    font-size: 0.75rem;
+  }
+
+  .overlay--summary .controls {
+    margin-top: 0.5rem;
+  }
+}
+
+/* Avoid decorative movement and abrupt transitions for motion-sensitive players. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
