@@ -2,11 +2,124 @@ import { GAME_HEIGHT, GAME_WIDTH } from './constants.js';
 
 /** Canvas-only presentation layer. Game balance and collision data stay in game.js/entities.js. */
 export class Renderer {
-  constructor(canvas, { reducedMotion = false } = {}) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.reducedMotion = reducedMotion; this.stars = this.createStars(); }
-  createStars() { return Array.from({ length: 110 }, (_, i) => ({ x: (i * 137) % GAME_WIDTH, y: (i * 71) % GAME_HEIGHT, size: 1 + (i % 3), speed: 8 + (i % 5) * 7 })); }
-  render(game, time) { const c = this.ctx; c.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT); this.background(c, this.reducedMotion ? 0 : time); game.projectiles.forEach((b) => this.projectile(c, b)); game.enemies.filter((e) => e.alive).forEach((e) => this.enemy(c, e)); this.player(c, game.player); }
-  background(c, time) { c.fillStyle = '#030918'; c.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); const glow = c.createRadialGradient(480, 170, 0, 480, 170, 620); glow.addColorStop(0, '#15386799'); glow.addColorStop(1, '#03091800'); c.fillStyle = glow; c.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); c.fillStyle = '#d7f9ff'; for (const star of this.stars) { const y = (star.y + time * star.speed) % GAME_HEIGHT; c.globalAlpha = .25 + star.size * .2; c.fillRect(star.x, y, star.size, star.size); } c.globalAlpha = 1; }
-  player(c, p) { c.save(); c.translate(p.x, p.y); c.globalAlpha = !this.reducedMotion && p.invulnerable > 0 && Math.floor(p.invulnerable * 12) % 2 ? .35 : 1; c.shadowColor = '#2eeaff'; c.shadowBlur = 18; c.fillStyle = '#66eaff'; c.beginPath(); c.moveTo(0, -25); c.lineTo(19, 20); c.lineTo(0, 13); c.lineTo(-19, 20); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = '#eafcff'; c.beginPath(); c.moveTo(0, -15); c.lineTo(6, 8); c.lineTo(-6, 8); c.closePath(); c.fill(); c.fillStyle = '#ff926b'; c.fillRect(-12, 18, 7, 13); c.fillRect(5, 18, 7, 13); c.restore(); }
-  enemy(c, e) { c.save(); c.translate(e.x, e.y); c.shadowColor = '#ff3f71'; c.shadowBlur = 12; c.fillStyle = e.row === 0 ? '#ff6e94' : '#c64670'; c.beginPath(); c.moveTo(-19, -10); c.lineTo(-8, -15); c.lineTo(8, -15); c.lineTo(19, -10); c.lineTo(14, 12); c.lineTo(-14, 12); c.closePath(); c.fill(); c.shadowBlur = 0; c.fillStyle = '#ffd6e0'; c.fillRect(-9, -4, 5, 4); c.fillRect(4, -4, 5, 4); c.restore(); }
-  projectile(c, b) { c.save(); c.shadowColor = b.owner === 'player' ? '#55eaff' : '#ff537b'; c.shadowBlur = 12; c.fillStyle = b.owner === 'player' ? '#b9fbff' : '#ff84a2'; c.fillRect(b.x - b.width / 2, b.y - b.height / 2, b.width, b.height); c.restore(); }
+  constructor(canvas, { reducedMotion = false } = {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.reducedMotion = reducedMotion;
+    this.stars = this.createStars();
+  }
+
+  createStars() {
+    return Array.from({ length: 110 }, (_, index) => ({
+      x: (index * 137) % GAME_WIDTH,
+      y: (index * 71) % GAME_HEIGHT,
+      size: 1 + (index % 3),
+      speed: 8 + (index % 5) * 7,
+    }));
+  }
+
+  render(game, time) {
+    const context = this.ctx;
+    const backgroundTime = this.reducedMotion ? 0 : time;
+
+    context.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.drawBackground(context, backgroundTime);
+    game.projectiles.forEach((projectile) => this.drawProjectile(context, projectile));
+    game.enemies.filter((enemy) => enemy.alive).forEach((enemy) => this.drawEnemy(context, enemy));
+    this.drawPlayer(context, game.player);
+  }
+
+  drawBackground(context, time) {
+    context.fillStyle = '#030918';
+    context.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    const glow = context.createRadialGradient(480, 170, 0, 480, 170, 620);
+    glow.addColorStop(0, '#15386799');
+    glow.addColorStop(1, '#03091800');
+    context.fillStyle = glow;
+    context.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    context.fillStyle = '#d7f9ff';
+    this.stars.forEach((star) => {
+      const y = (star.y + time * star.speed) % GAME_HEIGHT;
+
+      context.globalAlpha = 0.25 + star.size * 0.2;
+      context.fillRect(star.x, y, star.size, star.size);
+    });
+
+    context.globalAlpha = 1;
+  }
+
+  drawPlayer(context, player) {
+    const isBlinking = !this.reducedMotion
+      && player.invulnerable > 0
+      && Math.floor(player.invulnerable * 12) % 2;
+
+    context.save();
+    context.translate(player.x, player.y);
+    context.globalAlpha = isBlinking ? 0.35 : 1;
+    context.shadowColor = '#2eeaff';
+    context.shadowBlur = 18;
+    context.fillStyle = '#66eaff';
+    context.beginPath();
+    context.moveTo(0, -25);
+    context.lineTo(19, 20);
+    context.lineTo(0, 13);
+    context.lineTo(-19, 20);
+    context.closePath();
+    context.fill();
+
+    context.shadowBlur = 0;
+    context.fillStyle = '#eafcff';
+    context.beginPath();
+    context.moveTo(0, -15);
+    context.lineTo(6, 8);
+    context.lineTo(-6, 8);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = '#ff926b';
+    context.fillRect(-12, 18, 7, 13);
+    context.fillRect(5, 18, 7, 13);
+    context.restore();
+  }
+
+  drawEnemy(context, enemy) {
+    context.save();
+    context.translate(enemy.x, enemy.y);
+    context.shadowColor = '#ff3f71';
+    context.shadowBlur = 12;
+    context.fillStyle = enemy.row === 0 ? '#ff6e94' : '#c64670';
+    context.beginPath();
+    context.moveTo(-19, -10);
+    context.lineTo(-8, -15);
+    context.lineTo(8, -15);
+    context.lineTo(19, -10);
+    context.lineTo(14, 12);
+    context.lineTo(-14, 12);
+    context.closePath();
+    context.fill();
+
+    context.shadowBlur = 0;
+    context.fillStyle = '#ffd6e0';
+    context.fillRect(-9, -4, 5, 4);
+    context.fillRect(4, -4, 5, 4);
+    context.restore();
+  }
+
+  drawProjectile(context, projectile) {
+    const isPlayerProjectile = projectile.owner === 'player';
+
+    context.save();
+    context.shadowColor = isPlayerProjectile ? '#55eaff' : '#ff537b';
+    context.shadowBlur = 12;
+    context.fillStyle = isPlayerProjectile ? '#b9fbff' : '#ff84a2';
+    context.fillRect(
+      projectile.x - projectile.width / 2,
+      projectile.y - projectile.height / 2,
+      projectile.width,
+      projectile.height,
+    );
+    context.restore();
+  }
 }
