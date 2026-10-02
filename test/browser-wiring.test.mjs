@@ -126,6 +126,7 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     elements.get('start-button').click();
     assert.equal(browser.game.state, GameState.WAVE_INTRO);
     assert.equal(elements.get('wave-intro-title').textContent, 'WAVE 1');
+    assert.equal(elements.get('wave-intro-description').textContent, browser.game.waveDefinition.hint);
     assert.equal(elements.get('wave-intro-screen').classList.contains('is-hidden'), false);
 
     browser.pressKey('Escape');
@@ -146,6 +147,8 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     browser.frame();
     assert.equal(elements.get('wave-intro-title').textContent, 'SECTOR CLEAR');
     assert.match(elements.get('wave-intro-description').textContent, /Clear bonus: \+250/);
+    assert.match(elements.get('wave-intro-description').textContent, /No-damage bonus:/);
+    const expectedScore = String(browser.game.score).padStart(6, '0');
     browser.advance(WaveDefaults.clearDuration);
     assert.equal(elements.get('wave-intro-title').textContent, 'WAVE 2');
     browser.advance(WaveDefaults.introDuration);
@@ -153,12 +156,12 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     browser.frame();
 
     assert.equal(elements.get('game-over-screen').classList.contains('is-hidden'), false);
-    assert.equal(elements.get('final-score').textContent, '000375');
+    assert.equal(elements.get('final-score').textContent, expectedScore);
     assert.equal(elements.get('final-wave').textContent, '2');
     assert.equal(elements.get('final-destroyed').textContent, '1');
     assert.equal(elements.get('final-accuracy').textContent, '50%');
-    assert.equal(elements.get('best-score').textContent, '000375');
-    assert.equal(savedValues.get('space-attack.best-score'), '375');
+    assert.equal(elements.get('best-score').textContent, expectedScore);
+    assert.equal(savedValues.get('space-attack.best-score'), String(Number(expectedScore)));
     assert.equal(browser.focusedElement, 'restart-button');
 
     elements.get('restart-button').click();
@@ -166,7 +169,7 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     browser.game.endGame();
     browser.frame();
     assert.equal(elements.get('final-score').textContent, '000000');
-    assert.equal(elements.get('best-score').textContent, '000375');
+    assert.equal(elements.get('best-score').textContent, expectedScore);
     elements.get('mute-button').click();
     assert.equal(savedValues.get('space-attack.muted'), 'false');
   } finally {
@@ -191,6 +194,28 @@ test('browser startup and replay work with denied localStorage access', async ()
     assert.equal(browser.elements.get('best-score').textContent, '000600');
     browser.elements.get('mute-button').click();
     assert.equal(browser.elements.get('mute-button').attributes.get('aria-pressed'), 'true');
+  } finally {
+    browser.restore();
+  }
+});
+
+test('formation recovery announces playable continuation without changing score or lives', async () => {
+  const browser = await bootBrowser(() => { throw new Error('Storage denied'); });
+
+  try {
+    browser.elements.get('start-button').click();
+    browser.advance(WaveDefaults.introDuration);
+    browser.game.formation.x = NaN;
+    browser.game.formation.y = 5000;
+    browser.frame();
+    assert.match(browser.elements.get('game-status').textContent, /formation restored/);
+    assert.equal(browser.game.state, GameState.PLAYING);
+    assert.equal(browser.game.player.lives, 3);
+    assert.equal(browser.game.score, 0);
+    assert.ok(Number.isFinite(browser.game.formation.x));
+    assert.ok(browser.game.enemies.every((enemy) => enemy.y < 320));
+    assert.equal(browser.elements.get('pause-screen').classList.contains('is-hidden'), true);
+    assert.equal(browser.elements.get('game-over-screen').classList.contains('is-hidden'), true);
   } finally {
     browser.restore();
   }

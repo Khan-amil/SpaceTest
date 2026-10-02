@@ -112,6 +112,8 @@ test('death cancels a pending telegraph, dive, or return permanently', () => {
 
 test('dive scheduling respects intro, invulnerability, active cap, and pause', () => {
   const game = createPlayingGame();
+  // This scenario isolates a single-slot cap; wave 5 now reserves two divers.
+  game.waveDefinition.maxDivers = 1;
   const [first, second] = game.enemies;
 
   game.state = GameState.WAVE_INTRO;

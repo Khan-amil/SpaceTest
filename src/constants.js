@@ -55,6 +55,7 @@ export const GameEvent = Object.freeze({
   ENEMY_DIVE_TELEGRAPHED: 'enemyDiveTelegraphed',
   ENEMY_DIVE_STARTED: 'enemyDiveStarted',
   ENEMY_DIVE_ENDED: 'enemyDiveEnded',
+  ENEMY_STATE_RECOVERED: 'enemyStateRecovered',
   WAVE_STARTED: 'waveStarted',
   WAVE_CLEARED: 'waveCleared',
   POWERUP_COLLECTED: 'powerupCollected',

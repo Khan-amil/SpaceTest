@@ -8,7 +8,10 @@ import {
   WaveDefaults,
 } from './constants.js';
 import { createEnemy, createPlayer, createProjectile, overlaps } from './entities.js';
-import { getEnemyKindForRow, getWaveDefinition } from './waves.js';
+import { WaveLimits, getEnemyKindForSlot, getWaveDefinition } from './waves.js';
+import { selectFormationShooter } from './enemy-fire.js';
+import { advanceFormation, constrainFormation, synchronizeFormationMembers } from './formation.js';
+import { repairEnemyStates } from './enemy-safety.js';
 import {
   EnemyBehavior,
   beginEnemyDive,
@@ -23,9 +26,10 @@ import {
  * rendering, audio, or keyboard events. New systems should subscribe through `events`.
  */
 export class Game {
-  constructor(random = Math.random, waveDefinitionFactory = getWaveDefinition) {
+  constructor(random = Math.random, waveDefinitionFactory = getWaveDefinition, waveSeed = 0) {
     this.random = random;
     this.waveDefinitionFactory = waveDefinitionFactory;
+    this.waveSeed = waveSeed;
     this.reset();
   }
 
@@ -103,7 +107,7 @@ export class Game {
   }
 
   spawnWave() {
-    this.waveDefinition = this.waveDefinitionFactory(this.wave);
+    this.waveDefinition = this.waveDefinitionFactory(this.wave, this.waveSeed);
     const { columns, rows, spacingX, spacingY, startY } = this.waveDefinition.formation;
     const formationLeft = (GAME_WIDTH - (columns - 1) * spacingX) / 2;
 
@@ -112,12 +116,14 @@ export class Game {
       const column = index % columns;
       const x = formationLeft + column * spacingX;
       const y = startY + row * spacingY;
-      const kind = getEnemyKindForRow(this.waveDefinition.enemyMix, row);
+      const kind = getEnemyKindForSlot(this.waveDefinition.enemyMix, row, column);
 
       return createEnemy(x, y, row, kind);
     });
 
     this.enemyDirection = 1;
+    this.enemyFireLane = 'left';
+    this.waveDamageTaken = 0;
     this.formation = { x: 0, y: 0, elapsed: 0 };
     this.enemyFireTimer = this.waveDefinition.firing.initialDelay;
     this.enemyDiveTimer = this.waveDefinition.diveCadence ?? 0;
@@ -147,7 +153,7 @@ export class Game {
       phase: 'incoming',
       remaining: WaveDefaults.introDuration,
     };
-    this.emit(GameEvent.WAVE_STARTED, { wave: this.wave });
+    this.emit(GameEvent.WAVE_STARTED, { wave: this.wave, hint: this.waveDefinition.hint });
   }
 
   updateWaveIntro(dt) {
@@ -198,28 +204,17 @@ export class Game {
 
     if (!livingEnemies.length) return;
 
-    const formationMembers = livingEnemies.filter(isFormationMember);
-    const formationSpeed = this.waveDefinition.movement.speed;
-    const formationEdge = 38;
-    const reachesScreenEdge = formationMembers.some((enemy) => {
-      const definition = getEnemyDefinition(enemy.kind);
-      const nextX = enemy.home.x + enemy.formationOffset.x + this.formation.x
-        + this.enemyDirection * formationSpeed * dt;
-      // Reserve the bob envelope so wing tips remain inside the formation boundary.
-      return nextX + definition.bobAmplitude > GAME_WIDTH - formationEdge
-        || nextX - definition.bobAmplitude < formationEdge;
-    });
+    const repairedEnemies = repairEnemyStates(
+      this.enemies, this.formation, this.waveDefinition.formation, dt, this.player,
+    );
+    const repairedFormation = constrainFormation(this.formation, livingEnemies);
+    const repairedDirection = this.enemyDirection !== -1 && this.enemyDirection !== 1;
 
-    if (reachesScreenEdge) {
-      this.enemyDirection *= -1;
-      this.formation.y += this.waveDefinition.movement.dropDistance;
-    }
-
-    if (formationMembers.length > 0) {
-      this.formation.x += this.enemyDirection * formationSpeed * dt;
-    }
-
-    this.formation.elapsed += dt;
+    if (repairedDirection) this.enemyDirection = 1;
+    this.enemyDirection = advanceFormation(
+      this.formation, livingEnemies, this.enemyDirection,
+      this.waveDefinition.movement, dt,
+    );
 
     for (const enemy of livingEnemies) {
       enemy.aimedShotCooldown = Math.max(0, enemy.aimedShotCooldown - dt);
@@ -228,6 +223,17 @@ export class Game {
       if (action === 'started') this.emit(GameEvent.ENEMY_DIVE_STARTED, { enemy });
       if (action === 'ended') this.emit(GameEvent.ENEMY_DIVE_ENDED, { enemy });
       if (action === 'fire') this.fireAimedEnemyProjectile(enemy);
+    }
+
+    // Returning ships join after movement; immediately fit the expanded bounds this tick.
+    constrainFormation(this.formation, livingEnemies);
+    synchronizeFormationMembers(this.formation, livingEnemies);
+
+    if (repairedFormation || repairedDirection || repairedEnemies.length > 0) {
+      this.projectiles = this.projectiles.filter((projectile) => projectile.owner === 'player');
+      this.enemyFireTimer = this.waveDefinition.firing.initialDelay;
+      this.enemyDiveTimer = this.waveDefinition.diveCadence ?? 0;
+      this.emit(GameEvent.ENEMY_STATE_RECOVERED, { enemies: repairedEnemies.length });
     }
 
     this.updateDiveCadence(dt);
@@ -290,6 +296,7 @@ export class Game {
 
     if (this.state !== GameState.PLAYING || !enemy.alive || !attack.aimedShot) return false;
     if (enemy.aimedShotCooldown > 0) return false;
+    if (!this.canCreateProjectile('enemy')) return false;
 
     const speed = Math.min(attack.maxShotSpeed, this.waveDefinition.firing.projectileSpeed);
     const horizontalDistance = this.player.x + this.player.velocityX * attack.shotLead - enemy.x;
@@ -334,6 +341,7 @@ export class Game {
 
   firePlayerProjectile() {
     if (this.state !== GameState.PLAYING) return;
+    if (!this.canCreateProjectile('player')) return;
 
     const player = this.player;
 
@@ -343,13 +351,38 @@ export class Game {
     this.emit(GameEvent.PLAYER_FIRED);
   }
 
+  canCreateProjectile(owner) {
+    const livingProjectiles = this.projectiles.filter((projectile) => projectile.alive);
+
+    if (livingProjectiles.length >= WaveLimits.totalProjectiles) return false;
+    if (owner === 'player') return true;
+
+    const enemyCount = livingProjectiles.filter((projectile) => projectile.owner === 'enemy').length;
+    const enemyLimit = Math.min(
+      this.waveDefinition.firing.maxProjectiles ?? WaveLimits.enemyProjectiles,
+      WaveLimits.enemyProjectiles,
+    );
+
+    return enemyCount < enemyLimit;
+  }
+
   fireEnemyProjectile(livingEnemies) {
-    const randomIndex = Math.floor(this.random() * livingEnemies.length);
-    const shooter = livingEnemies[randomIndex];
     const { projectileSpeed, interval } = this.waveDefinition.firing;
 
-    this.projectiles.push(createProjectile(shooter.x, shooter.y + 23, projectileSpeed, 'enemy'));
+    // Saturation skips a firing beat instead of building a burst when room returns.
     this.enemyFireTimer = interval;
+    if (this.state !== GameState.PLAYING || !this.canCreateProjectile('enemy')) return false;
+
+    const shooters = livingEnemies.filter((enemy) => enemy.alive && isFormationMember(enemy));
+    const shooter = selectFormationShooter(
+      shooters, this.waveDefinition.firing.pattern, this.enemyFireLane, this.random,
+    );
+
+    if (!shooter) return false;
+
+    this.projectiles.push(createProjectile(shooter.x, shooter.y + 23, projectileSpeed, 'enemy'));
+    this.enemyFireLane = this.enemyFireLane === 'left' ? 'right' : 'left';
+    return true;
   }
 
   resolvePlayerProjectileCollision(projectile) {
@@ -414,9 +447,13 @@ export class Game {
     if (this.state !== GameState.PLAYING || !waveIsCleared || this.waveClearStarted) return;
 
     this.waveClearStarted = true;
-    const bonus = this.waveDefinition.clearBonus;
+    const clearBonus = this.waveDefinition.clearBonus;
+    const noDamageBonus = this.waveDamageTaken === 0 ? this.waveDefinition.noDamageBonus ?? 0 : 0;
+    const bonus = clearBonus + noDamageBonus;
     this.score += bonus;
-    this.emit(GameEvent.WAVE_CLEARED, { wave: this.wave, bonus, score: this.score });
+    this.emit(GameEvent.WAVE_CLEARED, {
+      wave: this.wave, bonus, clearBonus, noDamageBonus, score: this.score,
+    });
 
     if (!SessionRules.advancesOnWaveClear) return;
 
@@ -426,6 +463,8 @@ export class Game {
     this.waveIntro = {
       phase: 'cleared',
       bonus,
+      clearBonus,
+      noDamageBonus,
       remaining: WaveDefaults.clearDuration,
     };
     this.state = GameState.WAVE_INTRO;
@@ -435,6 +474,7 @@ export class Game {
     if (this.state !== GameState.PLAYING || this.player.invulnerable > 0) return;
 
     this.player.lives -= 1;
+    this.waveDamageTaken += 1;
     this.player.invulnerable = PlayerDefaults.invulnerability;
     this.emit(GameEvent.PLAYER_DAMAGED, { lives: this.player.lives, source });
 

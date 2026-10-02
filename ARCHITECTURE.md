@@ -18,6 +18,8 @@ The game is intentionally arranged as ES modules with one responsibility each:
 | `src/entities.js` | Entity factories and collision primitive | Game rules or rendering |
 | `src/waves.js` | Wave recipes, formation layouts, cadence, and clear rewards | Runtime state or enemy behavior |
 | `src/enemy-ai.js` | Archetype registry, formation targets, and enemy behavior transitions | DOM/canvas/audio |
+| `src/formation.js` | Directional edge turns, bounded translation, and same-tick re-entry fitting | Combat outcomes or DOM |
+| `src/enemy-safety.js` | Invalid movement-state repair and independent behavior watchdog | Score, health, lives, or drawing |
 | `src/dive-paths.js` | Cubic Bézier evaluation, departure paths, exit clearance, and return geometry | State transitions or rendering |
 | `src/enemies/*-definition.js` | Immutable archetype health, rewards, dimensions, and motion data | Runtime state or drawing |
 | `src/enemies/scout.js`, `wasp.js`, `sentinel.js` | Original canvas silhouette drawing | Simulation rules |
@@ -56,7 +58,10 @@ The game is intentionally arranged as ES modules with one responsibility each:
 
 `Game.start()` introduces Wave 1 for 1.25 simulation seconds before enabling play. When the last living enemy is removed, a 0.7-second clear notice awards the recipe's bonus, followed by the next wave's introduction. These timers advance through the fixed update loop without blocking browser rendering. Only the intro/clear timer advances during `WAVE_INTRO`; `PAUSED` advances nothing. A fatal hit takes precedence over advancing the wave.
 
-`getWaveDefinition(number)` rotates three small layout variants while preserving the first 7×3 grid and the existing speed/fire scaling. Recipes declare a row-based enemy mix. `Game` optionally accepts a wave-definition factory as its second constructor argument for deterministic configuration tests.
+`getWaveDefinition(number, seed)` selects authored difficulty bands and seeded late
+remixes while preserving the first 7×3 grid. Row defaults support column-specific
+overrides. `Game` accepts a wave-definition factory as its second constructor
+argument and a stable wave seed as its third argument for deterministic scenarios.
 
 The browser merges the immutable game-over summary with the saved best score when displaying the overlay. Storage is optional, stores no run history, and never enters the simulation. The automated suite includes simulation, storage, input, markup, and browser-composition checks. See [PHASE_1_PLAYTEST.md](PHASE_1_PLAYTEST.md) for the pending manual acceptance gate.
 
@@ -75,9 +80,10 @@ Dead enemies enter `exploding`,
 clear path data, and are collision-disabled immediately; the renderer currently
 removes them without an explosion lifetime, leaving particles to Phase 6.
 
-Waves 1–2 retain Scouts only and disable dives. Wave 3 adds a Wasp row; wave 5 adds
-a Sentinel row. Starting at wave 3, cadence is five seconds and one active diver
-includes telegraphing and returning enemies. Invulnerability blocks new dives.
+Waves 1–2 retain Scouts only and disable dives. Wave 3 adds a rear Wasp row; wave 5
+adds one rear Sentinel. Phase 4 recipes set cadence and reserve one diver at wave 3,
+two at wave 5, and three from wave 10. Capacity includes telegraphs and returns.
+Invulnerability blocks new dives.
 Sentinel selection has one quarter the per-enemy dive weight of other types.
 The whole formation shares its speed; Sentinel's slower movement is its dive duration
 and quieter bob. Each Wasp dive creates one shot with a bounded downward aim angle;
@@ -120,9 +126,63 @@ The player exposes actual velocity after movement clamps. A Wasp fires once per
 dive with 0.18 seconds of lead, a ±0.65-radian downward angle limit, a 340-pixel-per-
 second speed limit, and a one-second per-enemy cooldown. These settings live in
 its pure archetype definition. Cooldowns advance only during play and reset with
-new entities. Difficulty bands and general projectile budgets remain Phase 4.
+new entities. Phase 4 supplies difficulty bands and shared projectile budgets.
 
 Automated coverage includes curve geometry, joined tangents/acceleration, edge exit
 clearance, warning protection, capacity across all stages, moving-home convergence,
 shot lead/cooldown, seeded events, collision cleanup, pause, and restart. See
 [PHASE_3_PLAYTEST.md](PHASE_3_PLAYTEST.md) for the browser smoke check and human gate.
+
+## Phase 4 recipes and capacity
+
+`src/wave-recipes/early.js`, `middle.js`, and `endless.js` own balance content.
+`waves.js` copies recipes, applies global caps, resolves specific slots before row
+defaults, and rejects recipes over their threat budget. Scouts cost 1, Wasps 2,
+Sentinels 4; each reserved diver costs another 3. The reservation covers the full
+warning/dive/return cycle. Budget is permission for a combination, not a requirement
+to spend every point. Endless selection hashes a stable seed and rotates ten layouts;
+it does not consume combat RNG or endlessly add rows.
+
+Formation speed caps at 1.65 × the shared baseline, hostile projectile speed at 400,
+firing interval at a minimum 0.55 seconds, dive cadence at a minimum 2.8 seconds,
+and reserved divers at three. Recipes cap hostile bullets below the global ceiling
+of 12; formation and aimed shots consume the same allowance. Total live bullets
+cap at 40. Skipping a saturated formation shot consumes its firing beat, preventing
+a backlog burst. `enemy-fire.js` alternates between surviving formation halves for
+crossfire, falling back to the survivor when a lane is depleted.
+
+Actual damage increments a per-wave counter. A zero-damage clear adds a small
+recipe-defined mastery reward, separately exposed in the clear event and overlay.
+Spawning a wave and restarting reset damage and lane state. Incoming events carry
+the recipe's one-line hint for the visible overlay and polite live announcement.
+Automated verification does not establish the survival targets; final approval
+requires the human gate in [PHASE_4_PLAYTEST.md](PHASE_4_PLAYTEST.md).
+
+## Formation return regression and recovery
+
+An outer diver can return after its surviving column mates were destroyed. The
+smaller formation can travel beyond the returning slot's safe horizontal bounds.
+The old either-edge check reversed and dropped the group every fixed tick even
+when it was moving inward, sending enemies offscreen permanently.
+
+`formation.js` turns only on outward edge crossings. It clamps shared translation
+to the current formation members before movement and fits newly returned members
+again after behavior updates in the same tick. Re-entry fitting causes no drop.
+Bob envelopes remain reserved, and divers still do not steer horizontal bounds.
+All living slots reserve vertical return space: formation hulls stop descending
+at y = 320, above the player's lowest upward firing origin. Ships continue moving,
+firing and diving at this limit; there is no offscreen invasion or empty-play stall.
+
+`enemy-safety.js` restores invalid anchors, coordinates, unknown/malformed behavior
+and stalled stages to formation without changing health, rewards or lives. An
+independent simulation clock limits each warning/dive/return stage to its configured
+duration plus one second; legitimate warnings waiting on invulnerability are exempt.
+Valid brief offscreen dive exits remain allowed. Shared translation is repaired in
+the same update. Recovery emits `enemyStateRecovered`, clears hostile bullets,
+and resets hostile firing/dive delays so recovery cannot introduce a surprise burst.
+The browser announces continuation through the existing polite live region.
+
+Pause freezes the watchdog and recovery. Wave spawn/restart creates fresh enemy
+state. Deterministic regression tests cover both edges, simultaneous returns/drops,
+five minutes of edge sweeps, corrupted positions/paths, stuck clocks, preserved
+health/score, shootable recovered targets, single wave clear, and browser feedback.

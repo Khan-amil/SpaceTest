@@ -50,7 +50,7 @@ test('clearing a wave awards one bonus and introduces the next wave on a later t
   });
   game.projectiles.push(createProjectile(game.player.x, game.player.y - 50, 0, 'enemy'));
   const previousEnemies = game.enemies;
-  const clearBonus = game.waveDefinition.clearBonus;
+  const clearBonus = game.waveDefinition.clearBonus + game.waveDefinition.noDamageBonus;
   game.update(FIXED_STEP, idle);
 
   assert.equal(game.wave, 1);
@@ -80,7 +80,11 @@ test('clearing a wave awards one bonus and introduces the next wave on a later t
 
   const events = game.consumeEvents();
   assert.deepEqual(events.map((event) => event.type), [GameEvent.WAVE_CLEARED, GameEvent.WAVE_STARTED]);
-  assert.deepEqual(events[0], { type: GameEvent.WAVE_CLEARED, wave: 1, bonus: clearBonus, score: clearBonus });
+  assert.deepEqual(events[0], {
+    type: GameEvent.WAVE_CLEARED, wave: 1, bonus: clearBonus, score: clearBonus,
+    clearBonus: game.waveDefinitionFactory(1).clearBonus,
+    noDamageBonus: game.waveDefinitionFactory(1).noDamageBonus,
+  });
 
   advanceFor(game, WaveDefaults.introDuration);
   assert.equal(game.state, GameState.PLAYING);
@@ -124,7 +128,7 @@ test('destroying the final target emits destruction before one clear bonus', () 
 
   assert.equal(game.state, GameState.WAVE_INTRO);
   assert.equal(game.wave, 1);
-  assert.equal(game.score, 125 + game.waveDefinition.clearBonus);
+  assert.equal(game.score, 125 + game.waveDefinition.clearBonus + game.waveDefinition.noDamageBonus);
   assert.equal(game.statistics.enemiesDestroyed, 1);
   assert.equal(game.statistics.shotsHit, 1);
   assert.deepEqual(game.consumeEvents().map((event) => event.type), [
@@ -331,10 +335,18 @@ test('fatal contact with the final enemy ends the run before any clear bonus', (
   const enemy = game.enemies[0];
 
   game.enemies = [enemy];
-  enemy.home.x = game.player.x;
   enemy.x = game.player.x;
-  enemy.home.y = game.player.y;
   enemy.y = game.player.y;
+  // Contact comes from a diver; formation targets stay above the player zone.
+  enemy.behavior = 'diving';
+  enemy.dive = {
+    elapsed: 0,
+    shotFired: true,
+    path: {
+      duration: 1,
+      segments: [Array.from({ length: 4 }, () => ({ x: game.player.x, y: game.player.y }))],
+    },
+  };
   game.player.lives = 1;
   game.consumeEvents();
   game.update(FIXED_STEP, idle);

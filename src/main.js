@@ -115,15 +115,20 @@ function handleCommands() {
 function consumeGameEvents() {
   for (const event of game.consumeEvents()) {
     if (event.type === GameEvent.WAVE_STARTED) {
-      announce(`Wave ${event.wave}. Clear all enemies to advance.`);
+      announce(`Wave ${event.wave}. ${event.hint ?? 'Clear all enemies to advance.'}`);
     }
 
     if (event.type === GameEvent.WAVE_CLEARED) {
-      announce(`Wave ${event.wave} cleared. Bonus ${event.bonus} points.`);
+      const masteryMessage = event.noDamageBonus > 0 ? ` No-damage bonus ${event.noDamageBonus}.` : '';
+      announce(`Wave ${event.wave} cleared. Bonus ${event.bonus} points.${masteryMessage}`);
     }
 
     if (event.type === GameEvent.PLAYER_DAMAGED) {
       announce(`Hull hit. ${event.lives} lives remaining.`);
+    }
+
+    if (event.type === GameEvent.ENEMY_STATE_RECOVERED) {
+      announce('Enemy formation restored. Continue the mission.');
     }
 
     if (event.type === GameEvent.GAME_OVER) {
@@ -151,8 +156,9 @@ function syncUi() {
 
     elements.waveIntroTitle.textContent = isClearTransition ? 'SECTOR CLEAR' : `WAVE ${game.wave}`;
     elements.waveIntroDescription.textContent = isClearTransition
-      ? `Clear bonus: +${game.waveIntro.bonus}. Preparing wave ${game.pendingWave}.`
-      : 'Prepare to engage.';
+      ? `Clear bonus: +${game.waveIntro.clearBonus}. ${game.waveIntro.noDamageBonus > 0
+        ? `No-damage bonus: +${game.waveIntro.noDamageBonus}. ` : ''}Preparing wave ${game.pendingWave}.`
+      : game.waveDefinition.hint;
   }
 
   if (game.state === GameState.GAME_OVER) {

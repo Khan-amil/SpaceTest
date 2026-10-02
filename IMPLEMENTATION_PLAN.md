@@ -183,6 +183,13 @@ Rules for the curve:
 
 **Playtest gate:** A new player should normally reach wave 3; a practiced player should reach wave 7 reliably; advanced players should have meaningful score-chasing beyond wave 10. Revise targets after real playtests, not before.
 
+**Implementation status:** implemented; final approval pending manual playtests.
+Three Luna sub-agents authored waves 1–4, 5–9, and ten seeded endless remixes.
+Named bands, slot-specific safe elite debuts, bounded threat budgets, alternating
+formation lanes, shared hostile/total projectile caps, wave hints, and separate
+no-damage clear rewards are integrated with deterministic coverage. Balance
+settings are provisional. See [PHASE_4_PLAYTEST.md](PHASE_4_PLAYTEST.md).
+
 ## Phase 5 — player combat, health, and rewards
 
 **Outcome:** The player has just enough options to answer new pressure without losing Space Invaders clarity.

@@ -1,47 +1,73 @@
 import { WaveDefaults } from './constants.js';
+import { EARLY_WAVE_RECIPES } from './wave-recipes/early.js';
+import { MIDDLE_WAVE_RECIPES } from './wave-recipes/middle.js';
+import { getEndlessWaveRecipe } from './wave-recipes/endless.js';
 
-// Layout variation stays small; authored difficulty bands belong to Phase 4.
-const FORMATION_RECIPES = Object.freeze([
-  { columns: 7, rows: 3, spacingX: 75, spacingY: 53, startY: 105 },
-  { columns: 6, rows: 3, spacingX: 85, spacingY: 53, startY: 105 },
-  { columns: 7, rows: 3, spacingX: 70, spacingY: 48, startY: 110 },
-]);
+export const WaveLimits = Object.freeze({
+  formationSpeed: WaveDefaults.baseSpeed * 1.65,
+  projectileSpeed: 400,
+  minimumFireInterval: 0.55,
+  minimumDiveCadence: 2.8,
+  maxDivers: 3,
+  enemyProjectiles: 12,
+  totalProjectiles: 40,
+});
 
-/**
- * Introduce silhouettes gradually: Scouts first, Wasps at wave 3, Sentinels at wave 5.
- */
-export function getWaveDefinition(waveNumber) {
-  const number = Number.isSafeInteger(waveNumber) && waveNumber > 0 ? waveNumber : 1;
-  const difficultyOffset = number - 1;
-  const formation = FORMATION_RECIPES[difficultyOffset % FORMATION_RECIPES.length];
+export const ThreatCosts = Object.freeze({ scout: 1, wasp: 2, sentinel: 4, diver: 3 });
 
-  return {
-    number,
-    formation: { ...formation },
-    enemyMix: number < 3
-      ? [{ kind: 'scout', rows: [0, 1, 2] }]
-      : [
-        { kind: number >= 5 ? 'sentinel' : 'scout', rows: [0] },
-        { kind: 'wasp', rows: [1] },
-        { kind: 'scout', rows: [2] },
-      ],
-    movement: {
-      speed: WaveDefaults.baseSpeed + difficultyOffset * 8,
-      dropDistance: WaveDefaults.dropDistance,
-    },
-    firing: {
-      initialDelay: 0.65,
-      interval: Math.max(0.35, WaveDefaults.fireInterval - number * 0.07),
-      projectileSpeed: 260 + number * 15,
-    },
-    diveCadence: number < 3 ? null : 5,
-    maxDivers: number < 3 ? 0 : 1,
-    clearBonus: 250 + difficultyOffset * 50,
-  };
+/** Specific cells override row defaults, keeping elite debuts sparse and deliberate. */
+export function getEnemyKindForSlot(enemyMix, row, column) {
+  const cellEntry = enemyMix.find((entry) => (
+    entry.rows.includes(row) && entry.columns?.includes(column)
+  ));
+  const rowEntry = enemyMix.find((entry) => entry.rows.includes(row) && !entry.columns);
+
+  return cellEntry?.kind ?? rowEntry?.kind ?? 'scout';
 }
 
 export function getEnemyKindForRow(enemyMix, row) {
-  const entry = enemyMix.find((candidate) => candidate.rows.includes(row));
+  return getEnemyKindForSlot(enemyMix, row, undefined);
+}
 
-  return entry?.kind ?? 'scout';
+export function calculateWaveThreat(recipe) {
+  let threat = recipe.maxDivers * ThreatCosts.diver;
+
+  for (let row = 0; row < recipe.formation.rows; row += 1) {
+    for (let column = 0; column < recipe.formation.columns; column += 1) {
+      const kind = getEnemyKindForSlot(recipe.enemyMix, row, column);
+      threat += ThreatCosts[kind];
+    }
+  }
+
+  return threat;
+}
+
+/** A stable seed rotates late recipes independently of combat RNG consumption. */
+export function getWaveDefinition(waveNumber, seed = 0) {
+  const number = Number.isSafeInteger(waveNumber) && waveNumber > 0 ? waveNumber : 1;
+  const authoredRecipes = [...EARLY_WAVE_RECIPES, ...MIDDLE_WAVE_RECIPES];
+  const source = number <= authoredRecipes.length
+    ? authoredRecipes[number - 1]
+    : getEndlessWaveRecipe(number, seed);
+  const recipe = structuredClone(source);
+
+  recipe.number = number;
+  recipe.movement.speed = Math.min(recipe.movement.speed, WaveLimits.formationSpeed);
+  recipe.firing.projectileSpeed = Math.min(recipe.firing.projectileSpeed, WaveLimits.projectileSpeed);
+  recipe.firing.interval = Math.max(recipe.firing.interval, WaveLimits.minimumFireInterval);
+  recipe.firing.maxProjectiles = Math.min(recipe.firing.maxProjectiles, WaveLimits.enemyProjectiles);
+  recipe.maxDivers = Math.min(recipe.maxDivers, WaveLimits.maxDivers);
+
+  if (recipe.diveCadence !== null) {
+    recipe.diveCadence = Math.max(recipe.diveCadence, WaveLimits.minimumDiveCadence);
+  }
+
+  recipe.threatCost = calculateWaveThreat(recipe);
+
+  // Fail authored over-budget combinations instead of silently changing their composition.
+  if (!Number.isFinite(recipe.threatCost) || recipe.threatCost > recipe.threatBudget) {
+    throw new RangeError(`Wave ${number} exceeds its threat budget.`);
+  }
+
+  return recipe;
 }
