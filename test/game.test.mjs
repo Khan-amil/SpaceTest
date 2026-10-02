@@ -95,9 +95,9 @@ test('projectile collisions damage their intended target exactly once', () => {
   game.resolveCollisions();
 
   assert.equal(enemy.alive, false);
-  assert.equal(game.score, 175);
+  assert.equal(game.score, 125);
   game.resolveCollisions();
-  assert.equal(game.score, 175);
+  assert.equal(game.score, 125);
   assert.equal(game.statistics.enemiesDestroyed, 1);
   assert.equal(game.statistics.shotsHit, 1);
 
@@ -124,7 +124,7 @@ test('destroying the final target emits destruction before one clear bonus', () 
 
   assert.equal(game.state, GameState.WAVE_INTRO);
   assert.equal(game.wave, 1);
-  assert.equal(game.score, 175 + game.waveDefinition.clearBonus);
+  assert.equal(game.score, 125 + game.waveDefinition.clearBonus);
   assert.equal(game.statistics.enemiesDestroyed, 1);
   assert.equal(game.statistics.shotsHit, 1);
   assert.deepEqual(game.consumeEvents().map((event) => event.type), [
@@ -177,7 +177,9 @@ test('direct enemy contact removes one life and grants visible invulnerability',
   const game = createPlayingGame();
 
   const enemy = game.enemies[0];
+  enemy.home.x = game.player.x;
   enemy.x = game.player.x;
+  enemy.home.y = game.player.y;
   enemy.y = game.player.y;
   game.resolveCollisions();
 
@@ -296,7 +298,7 @@ test('game over reports a stable summary with zero-shot and partial-hit accuracy
   game.firePlayerProjectile();
   game.endGame();
 
-  assert.deepEqual(game.gameOverSummary, { score: 175, waveReached: 1, enemiesDestroyed: 1, accuracy: 50 });
+  assert.deepEqual(game.gameOverSummary, { score: 125, waveReached: 1, enemiesDestroyed: 1, accuracy: 50 });
   assert.ok(Object.isFrozen(game.gameOverSummary));
   const gameOverEvents = game.consumeEvents().filter((event) => event.type === GameEvent.GAME_OVER);
   assert.deepEqual(gameOverEvents, [{ type: GameEvent.GAME_OVER, ...game.gameOverSummary }]);
@@ -329,7 +331,9 @@ test('fatal contact with the final enemy ends the run before any clear bonus', (
   const enemy = game.enemies[0];
 
   game.enemies = [enemy];
+  enemy.home.x = game.player.x;
   enemy.x = game.player.x;
+  enemy.home.y = game.player.y;
   enemy.y = game.player.y;
   game.player.lives = 1;
   game.consumeEvents();
@@ -351,7 +355,7 @@ test('configured layouts, enemy mix, movement, and bullet cadence drive the simu
   const customDefinition = {
     ...getWaveDefinition(1),
     formation: { columns: 2, rows: 2, spacingX: 60, spacingY: 45, startY: 90 },
-    enemyMix: [{ kind: 'scout', rows: [0] }, { kind: 'test-kind', rows: [1] }],
+    enemyMix: [{ kind: 'scout', rows: [0] }, { kind: 'sentinel', rows: [1] }],
     movement: { speed: 64, dropDistance: 15 },
     firing: { initialDelay: 0.1, interval: 0.5, projectileSpeed: 320 },
   };
@@ -360,7 +364,7 @@ test('configured layouts, enemy mix, movement, and bullet cadence drive the simu
   game.start();
   game.update(WaveDefaults.introDuration, idle);
   assert.deepEqual(game.enemies.map((enemy) => [enemy.x, enemy.y, enemy.kind]), [
-    [450, 90, 'scout'], [510, 90, 'scout'], [450, 135, 'test-kind'], [510, 135, 'test-kind'],
+    [450, 90, 'scout'], [510, 90, 'scout'], [450, 135, 'sentinel'], [510, 135, 'sentinel'],
   ]);
 
   const initialX = game.enemies[0].x;

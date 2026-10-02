@@ -1,8 +1,6 @@
 import { WaveDefaults } from './constants.js';
 
-const SCOUT_ROWS = Object.freeze([0, 1, 2]);
-
-// Small formation variations exercise the recipe seam without introducing Phase 2 enemies.
+// Layout variation stays small; authored difficulty bands belong to Phase 4.
 const FORMATION_RECIPES = Object.freeze([
   { columns: 7, rows: 3, spacingX: 75, spacingY: 53, startY: 105 },
   { columns: 6, rows: 3, spacingX: 85, spacingY: 53, startY: 105 },
@@ -10,8 +8,7 @@ const FORMATION_RECIPES = Object.freeze([
 ]);
 
 /**
- * Returns the complete recipe for a wave. The current game only has Scouts, but the
- * row-based mix allows later archetypes to be introduced without changing spawning.
+ * Introduce silhouettes gradually: Scouts first, Wasps at wave 3, Sentinels at wave 5.
  */
 export function getWaveDefinition(waveNumber) {
   const number = Number.isSafeInteger(waveNumber) && waveNumber > 0 ? waveNumber : 1;
@@ -21,12 +18,13 @@ export function getWaveDefinition(waveNumber) {
   return {
     number,
     formation: { ...formation },
-    enemyMix: [
-      {
-        kind: 'scout',
-        rows: SCOUT_ROWS,
-      },
-    ],
+    enemyMix: number < 3
+      ? [{ kind: 'scout', rows: [0, 1, 2] }]
+      : [
+        { kind: number >= 5 ? 'sentinel' : 'scout', rows: [0] },
+        { kind: 'wasp', rows: [1] },
+        { kind: 'scout', rows: [2] },
+      ],
     movement: {
       speed: WaveDefaults.baseSpeed + difficultyOffset * 8,
       dropDistance: WaveDefaults.dropDistance,
@@ -36,8 +34,8 @@ export function getWaveDefinition(waveNumber) {
       interval: Math.max(0.35, WaveDefaults.fireInterval - number * 0.07),
       projectileSpeed: 260 + number * 15,
     },
-    // Phase 2 consumes this field when formation-breaking behavior is introduced.
-    diveCadence: null,
+    diveCadence: number < 3 ? null : 5,
+    maxDivers: number < 3 ? 0 : 1,
     clearBonus: 250 + difficultyOffset * 50,
   };
 }

@@ -1,4 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from './constants.js';
+import { enemyVisuals } from './enemy-visuals.js';
 
 /** Canvas-only presentation layer. Game balance and collision data stay in game.js/entities.js. */
 export class Renderer {
@@ -87,23 +88,20 @@ export class Renderer {
   drawEnemy(context, enemy) {
     context.save();
     context.translate(enemy.x, enemy.y);
-    context.shadowColor = '#ff3f71';
-    context.shadowBlur = 12;
-    context.fillStyle = enemy.row === 0 ? '#ff6e94' : '#c64670';
-    context.beginPath();
-    context.moveTo(-19, -10);
-    context.lineTo(-8, -15);
-    context.lineTo(8, -15);
-    context.lineTo(19, -10);
-    context.lineTo(14, 12);
-    context.lineTo(-14, 12);
-    context.closePath();
-    context.fill();
+    enemyVisuals[enemy.kind](context, enemy);
 
-    context.shadowBlur = 0;
-    context.fillStyle = '#ffd6e0';
-    context.fillRect(-9, -4, 5, 4);
-    context.fillRect(4, -4, 5, 4);
+    if (enemy.behavior === 'telegraphingDive') {
+      // A persistent outline retains the warning in reduced-motion mode.
+      const pulse = this.reducedMotion ? 0 : Math.sin(enemy.dive.elapsed * 16) * 3;
+
+      context.shadowBlur = 0;
+      context.strokeStyle = '#fff4c7';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(0, 0, enemy.width / 2 + 6 + pulse, 0, Math.PI * 2);
+      context.stroke();
+    }
+
     context.restore();
   }
 

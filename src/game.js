@@ -9,6 +9,14 @@ import {
 } from './constants.js';
 import { createEnemy, createPlayer, createProjectile, overlaps } from './entities.js';
 import { getEnemyKindForRow, getWaveDefinition } from './waves.js';
+import {
+  EnemyBehavior,
+  beginEnemyDive,
+  cancelEnemyBehavior,
+  getEnemyDefinition,
+  isFormationMember,
+  updateEnemyBehavior,
+} from './enemy-ai.js';
 
 /**
  * Deterministic gameplay model. It owns mutable game state but knows nothing about DOM,
@@ -43,6 +51,8 @@ export class Game {
     this.projectiles = [];
     this.enemyDirection = 1;
     this.enemyFireTimer = 0;
+    this.enemyDiveTimer = 0;
+    this.formation = { x: 0, y: 0, elapsed: 0 };
     this.spawnWave();
   }
 
@@ -108,7 +118,9 @@ export class Game {
     });
 
     this.enemyDirection = 1;
+    this.formation = { x: 0, y: 0, elapsed: 0 };
     this.enemyFireTimer = this.waveDefinition.firing.initialDelay;
+    this.enemyDiveTimer = this.waveDefinition.diveCadence ?? 0;
     this.waveClearStarted = false;
     this.statistics.waveReached = Math.max(this.statistics.waveReached, this.wave);
   }
@@ -182,31 +194,107 @@ export class Game {
 
     if (!livingEnemies.length) return;
 
+    const formationMembers = livingEnemies.filter(isFormationMember);
     const formationSpeed = this.waveDefinition.movement.speed;
     const formationEdge = 38;
-    const reachesScreenEdge = livingEnemies.some((enemy) => {
-      const nextX = enemy.x + this.enemyDirection * formationSpeed * dt;
-      return nextX > GAME_WIDTH - formationEdge || nextX < formationEdge;
+    const reachesScreenEdge = formationMembers.some((enemy) => {
+      const definition = getEnemyDefinition(enemy.kind);
+      const nextX = enemy.home.x + enemy.formationOffset.x + this.formation.x
+        + this.enemyDirection * formationSpeed * dt;
+      // Reserve the bob envelope so wing tips remain inside the formation boundary.
+      return nextX + definition.bobAmplitude > GAME_WIDTH - formationEdge
+        || nextX - definition.bobAmplitude < formationEdge;
     });
 
     if (reachesScreenEdge) {
       this.enemyDirection *= -1;
-      livingEnemies.forEach((enemy) => {
-        enemy.y += this.waveDefinition.movement.dropDistance;
-      });
+      this.formation.y += this.waveDefinition.movement.dropDistance;
     }
 
-    livingEnemies.forEach((enemy) => {
-      enemy.x += this.enemyDirection * formationSpeed * dt;
-    });
+    if (formationMembers.length > 0) {
+      this.formation.x += this.enemyDirection * formationSpeed * dt;
+    }
+
+    this.formation.elapsed += dt;
+
+    for (const enemy of livingEnemies) {
+      const action = updateEnemyBehavior(enemy, this.formation, dt);
+
+      if (action === 'started') this.emit(GameEvent.ENEMY_DIVE_STARTED, { enemy });
+      if (action === 'ended') this.emit(GameEvent.ENEMY_DIVE_ENDED, { enemy });
+      if (action === 'fire') this.fireAimedEnemyProjectile(enemy);
+    }
+
+    this.updateDiveCadence(dt);
 
     this.enemyFireTimer -= dt;
 
-    if (this.enemyFireTimer <= 0) this.fireEnemyProjectile(livingEnemies);
+    const shooters = livingEnemies.filter(isFormationMember);
+
+    if (this.enemyFireTimer <= 0 && shooters.length > 0) this.fireEnemyProjectile(shooters);
+  }
+
+  beginDive(enemy) {
+    if (this.state !== GameState.PLAYING || this.player.invulnerable > 0) return false;
+    if (!this.enemies.includes(enemy) || !this.waveDefinition.diveCadence) return false;
+    if (!enemy.alive || enemy.behavior !== EnemyBehavior.FORMATION) return false;
+
+    const activeDivers = this.enemies.filter((candidate) => (
+      candidate.alive && !isFormationMember(candidate)
+    )).length;
+    const telegraphing = this.enemies.filter((candidate) => (
+      candidate.alive && candidate.behavior === EnemyBehavior.TELEGRAPHING_DIVE
+    )).length;
+
+    if (activeDivers + telegraphing >= this.waveDefinition.maxDivers) return false;
+    if (!beginEnemyDive(enemy, this.random() < 0.5 ? -1 : 1)) return false;
+
+    this.emit(GameEvent.ENEMY_DIVE_TELEGRAPHED, { enemy });
+    return true;
+  }
+
+  updateDiveCadence(dt) {
+    if (!this.waveDefinition.diveCadence) return;
+
+    this.enemyDiveTimer = Math.max(0, this.enemyDiveTimer - dt);
+
+    if (this.enemyDiveTimer > 0 || this.player.invulnerable > 0) return;
+
+    const candidates = this.enemies.filter((enemy) => (
+      enemy.alive && enemy.behavior === EnemyBehavior.FORMATION
+    ));
+
+    if (candidates.length === 0) return;
+
+    const totalWeight = candidates.reduce((total, enemy) => (
+      total + getEnemyDefinition(enemy.kind).dive.cadenceWeight
+    ), 0);
+    let selection = this.random() * totalWeight;
+    const selectedEnemy = candidates.find((enemy) => {
+      selection -= getEnemyDefinition(enemy.kind).dive.cadenceWeight;
+      return selection < 0;
+    }) ?? candidates[candidates.length - 1];
+
+    if (this.beginDive(selectedEnemy)) {
+      this.enemyDiveTimer = this.waveDefinition.diveCadence;
+    }
+  }
+
+  fireAimedEnemyProjectile(enemy) {
+    const speed = this.waveDefinition.firing.projectileSpeed;
+    const horizontalDistance = this.player.x - enemy.x;
+    const verticalDistance = Math.max(80, this.player.y - enemy.y);
+    // A bounded downward angle gives the Wasp pressure without a horizontal surprise shot.
+    const angle = Math.max(-0.65, Math.min(0.65, Math.atan2(horizontalDistance, verticalDistance)));
+    const projectile = createProjectile(enemy.x, enemy.y + 23, Math.cos(angle) * speed, 'enemy');
+
+    projectile.velocityX = Math.sin(angle) * speed;
+    this.projectiles.push(projectile);
   }
 
   updateProjectiles(dt) {
     this.projectiles.forEach((projectile) => {
+      projectile.x += projectile.velocityX * dt;
       projectile.y += projectile.velocityY * dt;
     });
   }
@@ -256,10 +344,17 @@ export class Game {
 
     if (!hitEnemy) return;
 
-    hitEnemy.alive = false;
     projectile.alive = false;
-    this.score += 100 + (this.waveDefinition.formation.rows - hitEnemy.row) * 25;
+    hitEnemy.health -= 1;
     this.statistics.shotsHit += 1;
+
+    if (hitEnemy.health > 0) {
+      this.emit(GameEvent.ENEMY_DAMAGED, { enemy: hitEnemy, health: hitEnemy.health });
+      return;
+    }
+
+    cancelEnemyBehavior(hitEnemy);
+    this.score += hitEnemy.value;
     this.statistics.enemiesDestroyed += 1;
     this.emit(GameEvent.ENEMY_DESTROYED, { enemy: hitEnemy, score: this.score });
   }
@@ -280,7 +375,7 @@ export class Game {
 
     if (!contactEnemy) return;
 
-    contactEnemy.alive = false;
+    cancelEnemyBehavior(contactEnemy);
     this.statistics.enemiesDestroyed += 1;
     this.emit(GameEvent.PLAYER_CONTACTED, { enemy: contactEnemy });
     this.damagePlayer('contact');
@@ -291,6 +386,8 @@ export class Game {
 
     this.projectiles = this.projectiles.filter((projectile) => (
       projectile.alive
+      && projectile.x > -projectileMargin
+      && projectile.x < GAME_WIDTH + projectileMargin
       && projectile.y > -projectileMargin
       && projectile.y < GAME_HEIGHT + projectileMargin
     ));

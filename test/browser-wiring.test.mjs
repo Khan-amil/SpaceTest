@@ -153,12 +153,12 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     browser.frame();
 
     assert.equal(elements.get('game-over-screen').classList.contains('is-hidden'), false);
-    assert.equal(elements.get('final-score').textContent, '000425');
+    assert.equal(elements.get('final-score').textContent, '000375');
     assert.equal(elements.get('final-wave').textContent, '2');
     assert.equal(elements.get('final-destroyed').textContent, '1');
     assert.equal(elements.get('final-accuracy').textContent, '50%');
-    assert.equal(elements.get('best-score').textContent, '000425');
-    assert.equal(savedValues.get('space-attack.best-score'), '425');
+    assert.equal(elements.get('best-score').textContent, '000375');
+    assert.equal(savedValues.get('space-attack.best-score'), '375');
     assert.equal(browser.focusedElement, 'restart-button');
 
     elements.get('restart-button').click();
@@ -166,7 +166,7 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
     browser.game.endGame();
     browser.frame();
     assert.equal(elements.get('final-score').textContent, '000000');
-    assert.equal(elements.get('best-score').textContent, '000425');
+    assert.equal(elements.get('best-score').textContent, '000375');
     elements.get('mute-button').click();
     assert.equal(savedValues.get('space-attack.muted'), 'false');
   } finally {

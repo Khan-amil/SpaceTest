@@ -113,6 +113,14 @@ Archetype configuration belongs in `waves.js`/`enemy-ai.js`, not in renderer con
 
 **Tests:** only configured archetypes appear; an enemy cannot begin a second dive while diving; enemy death cancels future behavior; returning enemies reacquire formation successfully.
 
+**Implementation status:** implemented; final gate pending manual playtest. Three Luna
+sub-agents created the Scout, Wasp, and Sentinel definitions and canvas visuals. The
+shared state model, stable home slots, type-based health/rewards, basic dive/return
+paths, telegraphs, and deterministic tests are integrated. Scouts appear from wave 1,
+Wasps from wave 3, and Sentinels from wave 5. See [PHASE_2_PLAYTEST.md](PHASE_2_PLAYTEST.md).
+Detailed Bézier paths and fairness tuning remain Phase 3 work; difficulty bands remain
+Phase 4 work.
+
 ## Phase 3 — design the formation-break dive system
 
 **Outcome:** Enemies become harder to hit but remain fair, legible, and deterministic.

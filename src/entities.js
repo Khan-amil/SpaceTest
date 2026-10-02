@@ -1,4 +1,5 @@
 import { GAME_WIDTH, PlayerDefaults } from './constants.js';
+import { EnemyBehavior, getEnemyDefinition } from './enemy-ai.js';
 
 let nextEntityId = 1;
 
@@ -14,17 +15,27 @@ export const createPlayer = () => ({
   invulnerable: 0,
 });
 
-export const createEnemy = (x, y, row, kind = 'scout') => ({
-  id: nextEntityId++,
-  type: 'enemy',
-  x,
-  y,
-  width: 38,
-  height: 28,
-  row,
-  kind,
-  alive: true,
-});
+export function createEnemy(x, y, row, kind = 'scout') {
+  const definition = getEnemyDefinition(kind);
+
+  return {
+    id: nextEntityId++,
+    type: 'enemy',
+    x,
+    y,
+    width: definition.width,
+    height: definition.height,
+    row,
+    kind,
+    behavior: EnemyBehavior.FORMATION,
+    home: { x, y },
+    formationOffset: { x: 0, y: 0 },
+    dive: null,
+    health: definition.health,
+    value: definition.value,
+    alive: true,
+  };
+}
 
 export const createProjectile = (x, y, velocityY, owner) => ({
   id: nextEntityId++,
@@ -34,6 +45,7 @@ export const createProjectile = (x, y, velocityY, owner) => ({
   width: 5,
   height: 14,
   velocityY,
+  velocityX: 0,
   owner,
   alive: true,
 });
