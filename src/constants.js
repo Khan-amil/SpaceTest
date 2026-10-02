@@ -28,8 +28,9 @@ export const WaveDefaults = Object.freeze({
   baseSpeed: 32,
   dropDistance: 22,
   fireInterval: 1.15,
-  introDuration: 1.25,
-  clearDuration: 0.7,
+  // Hints and two reward lines need several seconds of safe reading time.
+  introDuration: 4,
+  clearDuration: 3.5,
 });
 
 /** The game-session contract. A future continue system must explicitly revise this rule. */

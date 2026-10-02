@@ -28,6 +28,7 @@
         <div class="hud-stat">
           <span class="hud-label">Score</span>
           <strong id="score">000000</strong>
+          <span id="best-badge" class="best-badge is-hidden">NEW BEST</span>
         </div>
         <div class="hud-stat hud-stat--wave">
           <span class="hud-label">Wave</span>
@@ -37,9 +38,12 @@
           <span class="hud-label">Hull</span>
           <strong id="lives">3 / 3</strong>
         </div>
-        <button id="mute-button" class="hud-button" type="button" aria-pressed="false">
-          Sound: on
-        </button>
+        <div class="hud-actions">
+          <button id="pause-button" class="hud-button" type="button" disabled>Pause</button>
+          <button id="mute-button" class="hud-button" type="button" aria-pressed="false">
+            Sound: on
+          </button>
+        </div>
       </header>
 
       <section id="start-screen" class="overlay">

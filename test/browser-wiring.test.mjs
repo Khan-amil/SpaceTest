@@ -123,15 +123,18 @@ test('browser lifecycle displays introductions, clear bonus, full summary, and r
   try {
     const { elements } = browser;
     assert.equal(elements.get('mute-button').attributes.get('aria-pressed'), 'true');
+    assert.equal(elements.get('pause-button').disabled, true);
     elements.get('start-button').click();
     assert.equal(browser.game.state, GameState.WAVE_INTRO);
     assert.equal(elements.get('wave-intro-title').textContent, 'WAVE 1');
     assert.equal(elements.get('wave-intro-description').textContent, browser.game.waveDefinition.hint);
     assert.equal(elements.get('wave-intro-screen').classList.contains('is-hidden'), false);
+    assert.equal(elements.get('pause-button').disabled, false);
 
-    browser.pressKey('Escape');
+    elements.get('pause-button').click();
     assert.equal(browser.game.state, GameState.PAUSED);
     assert.equal(elements.get('pause-screen').classList.contains('is-hidden'), false);
+    assert.equal(elements.get('pause-button').textContent, 'Resume');
     assert.equal(browser.focusedElement, 'resume-button');
     elements.get('resume-button').click();
     assert.equal(browser.focusedElement, 'game-canvas');

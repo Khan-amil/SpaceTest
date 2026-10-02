@@ -3,6 +3,7 @@ import { Game } from './game.js';
 import { InputController } from './input.js';
 import { Renderer } from './renderer.js';
 import { createPreferencesStore } from './storage.js';
+import { GameAudio } from './audio.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -10,6 +11,7 @@ const game = new Game();
 const input = new InputController();
 const canvas = document.querySelector('#game-canvas');
 const renderer = new Renderer(canvas, { reducedMotion });
+const audio = new GameAudio();
 
 const elements = {
   canvas,
@@ -28,6 +30,8 @@ const elements = {
   finalAccuracy: document.querySelector('#final-accuracy'),
   bestScore: document.querySelector('#best-score'),
   muteButton: document.querySelector('#mute-button'),
+  pauseButton: document.querySelector('#pause-button'),
+  bestBadge: document.querySelector('#best-badge'),
   status: document.querySelector('#game-status'),
 };
 
@@ -40,12 +44,16 @@ const savedPreferences = preferencesStore.load();
 
 let muted = savedPreferences.muted;
 let bestScore = savedPreferences.bestScore;
+let bestCelebrated = false;
+let lastUiSignature = '';
+audio.setMuted(muted);
 
 const FIXED_STEP = 1 / 120;
 const MAX_FRAME_DURATION = 0.1;
 
 let previousFrameTime = performance.now();
 let accumulatedTime = 0;
+let presentationTime = 0;
 
 function announce(message) {
   elements.status.textContent = message;
@@ -56,6 +64,8 @@ function focusGameField() {
 }
 
 function startMission() {
+  audio.unlock();
+  bestCelebrated = false;
   input.clear();
   game.start();
   focusGameField();
@@ -64,6 +74,7 @@ function startMission() {
 }
 
 function resumeMission() {
+  audio.unlock();
   input.clear();
   game.resume();
   focusGameField();
@@ -73,6 +84,7 @@ function resumeMission() {
 
 function toggleMute() {
   muted = !muted;
+  audio.setMuted(muted);
 
   syncMuteButton();
   preferencesStore.saveMuted(muted);
@@ -84,24 +96,36 @@ function syncMuteButton() {
   elements.muteButton.textContent = `Sound: ${muted ? 'off' : 'on'}`;
 }
 
+function togglePause() {
+  const previousState = game.state;
+  game.togglePause();
+  input.clear();
+  syncUi();
+
+  if (game.state === GameState.PAUSED) {
+    resumeButton.focus();
+    announce('Game paused. Press Escape or Enter to resume.');
+  } else if (previousState === GameState.PAUSED) {
+    audio.unlock();
+    focusGameField();
+    announce('Mission resumed.');
+  }
+}
+
+function pulse(element) {
+  if (reducedMotion) return;
+  // Web Animations replaces an earlier pulse rather than accumulating animations.
+  element.getAnimations?.().forEach((animation) => animation.cancel());
+  element.animate?.([
+    { opacity: 0.6, transform: 'translateY(2px)' },
+    { opacity: 1, transform: 'translateY(0)' },
+  ], { duration: 350 });
+}
+
 function handleCommands() {
   if (input.consumePressed('mute')) toggleMute();
 
-  if (input.consumePressed('pause')) {
-    const previousState = game.state;
-    game.togglePause();
-
-    if (game.state === GameState.PAUSED) {
-      input.clear();
-      syncUi();
-      resumeButton.focus();
-      announce('Game paused. Press Escape or Enter to resume.');
-    } else if (previousState === GameState.PAUSED) {
-      input.clear();
-      focusGameField();
-      announce('Mission resumed.');
-    }
-  }
+  if (input.consumePressed('pause')) togglePause();
 
   if (!input.consumePressed('confirm')) return;
 
@@ -114,7 +138,17 @@ function handleCommands() {
 
 function consumeGameEvents() {
   for (const event of game.consumeEvents()) {
+    renderer.effects.handleEvent(event, game.player);
+    audio.handleEvent(event);
+    if (event.type === GameEvent.ENEMY_DESTROYED || event.type === GameEvent.WAVE_CLEARED) {
+      pulse(elements.score);
+      if (game.score > bestScore && !bestCelebrated) {
+        bestCelebrated = true;
+        pulse(elements.bestBadge);
+      }
+    }
     if (event.type === GameEvent.WAVE_STARTED) {
+      pulse(elements.waveIntroTitle);
       announce(`Wave ${event.wave}. ${event.hint ?? 'Clear all enemies to advance.'}`);
     }
 
@@ -124,6 +158,7 @@ function consumeGameEvents() {
     }
 
     if (event.type === GameEvent.PLAYER_DAMAGED) {
+      pulse(elements.lives);
       announce(`Hull hit. ${event.lives} lives remaining.`);
     }
 
@@ -142,9 +177,21 @@ function consumeGameEvents() {
 }
 
 function syncUi() {
+  const signature = [
+    game.state, game.score, game.wave, game.player.lives,
+    game.waveIntro?.phase, bestScore, bestCelebrated,
+  ].join('|');
+
+  // Timers and particles change every frame; DOM labels only change with the visible state.
+  if (signature === lastUiSignature) return;
+  lastUiSignature = signature;
+
   elements.score.textContent = String(game.score).padStart(6, '0');
   elements.wave.textContent = String(game.wave).padStart(2, '0');
   elements.lives.textContent = `${game.player.lives} / 3`;
+  elements.bestBadge.classList.toggle('is-hidden', !bestCelebrated);
+  elements.pauseButton.disabled = game.state === GameState.TITLE || game.state === GameState.GAME_OVER;
+  elements.pauseButton.textContent = game.state === GameState.PAUSED ? 'Resume' : 'Pause';
 
   elements.startScreen.classList.toggle('is-hidden', game.state !== GameState.TITLE);
   elements.pauseScreen.classList.toggle('is-hidden', game.state !== GameState.PAUSED);
@@ -189,7 +236,12 @@ function frame(currentTime) {
   updateGame();
   consumeGameEvents();
   syncUi();
-  renderer.render(game, currentTime / 1000);
+  if (game.state !== GameState.PAUSED) {
+    const presentationStep = Math.min(MAX_FRAME_DURATION, elapsedSeconds);
+    presentationTime += presentationStep;
+    renderer.effects.update(presentationStep);
+  }
+  renderer.render(game, presentationTime);
 
   requestAnimationFrame(frame);
 }
@@ -198,6 +250,7 @@ startButton.addEventListener('click', startMission);
 resumeButton.addEventListener('click', resumeMission);
 restartButton.addEventListener('click', startMission);
 elements.muteButton.addEventListener('click', toggleMute);
+elements.pauseButton.addEventListener('click', togglePause);
 
 syncMuteButton();
 syncUi();

@@ -192,6 +192,9 @@ settings are provisional. See [PHASE_4_PLAYTEST.md](PHASE_4_PLAYTEST.md).
 
 ## Phase 5 — player combat, health, and rewards
 
+**Implementation status:** postponed as lower priority by request. Phase 6 provides
+presentation hooks for pickup events without adding power-ups or changing combat rules.
+
 **Outcome:** The player has just enough options to answer new pressure without losing Space Invaders clarity.
 
 1. Improve firing feedback: brief muzzle flash, projectile trail, firing sound, and a small cooldown indicator only if it helps readability.
@@ -224,6 +227,13 @@ settings are provisional. See [PHASE_4_PLAYTEST.md](PHASE_4_PLAYTEST.md).
 - Include mute button/`M` shortcut and persist the choice locally.
 
 **Manual checks:** critical enemy bullets remain visible during explosions; no sound begins before user input; playing rapidly for several minutes has no growing particle/entity count; reduced-motion mode remains fully playable.
+
+**Implementation status:** implemented. Original synthesized audio, a fixed particle
+pool, restrained shake, ship animation, three star depths, subtle nebulae, bright
+projectile cores/trails, and HUD feedback are integrated through the event dispatcher.
+Menus and HUD controls have been polished at 320px and wide desktop widths; wave
+introductions last 4 seconds and clear notices last 3.5 seconds. Automated checks and
+browser smoke checks are recorded in [PHASE_6_PLAYTEST.md](PHASE_6_PLAYTEST.md).
 
 ## Phase 7 — UI, responsiveness, and accessibility
 

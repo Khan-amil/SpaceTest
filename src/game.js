@@ -348,7 +348,7 @@ export class Game {
     this.projectiles.push(createProjectile(player.x, player.y - 31, -570, 'player'));
     player.cooldown = PlayerDefaults.fireInterval;
     this.statistics.shotsFired += 1;
-    this.emit(GameEvent.PLAYER_FIRED);
+    this.emit(GameEvent.PLAYER_FIRED, { x: player.x, y: player.y - 31 });
   }
 
   canCreateProjectile(owner) {

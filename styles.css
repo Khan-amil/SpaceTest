@@ -1,11 +1,10 @@
-/* -------------------------------------------------------------------------- */
-/* Base and design surface                                                    */
-/* -------------------------------------------------------------------------- */
-
+/* Tokens and base ---------------------------------------------------------- */
 :root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   background: #020711;
+  --energy: #73e7ff;
+  --reward: #ffd479;
 }
 
 * {
@@ -17,54 +16,50 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  padding: 24px;
   place-items: center;
   background: radial-gradient(ellipse at 50% 15%, #102b59 0%, #061126 33%, #020711 80%);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Game layout                                                                */
-/* -------------------------------------------------------------------------- */
-
+/* Layout ------------------------------------------------------------------- */
 .game-shell {
   position: relative;
-  width: min(960px, 100vw);
-  overflow: hidden;
-  aspect-ratio: 3 / 2;
+  display: grid;
+  width: min(960px, 100%);
+  border: 1px solid #6bdcff44;
+  border-radius: 12px;
   background: #030919;
-  box-shadow: 0 25px 90px #000a, inset 0 0 0 1px #6bdcff44;
+  box-shadow: 0 25px 90px #000a;
 }
 
 canvas {
   display: block;
+  grid-area: 2 / 1;
   width: 100%;
-  height: 100%;
-  image-rendering: auto;
+  height: auto;
+  align-self: center;
+  aspect-ratio: 3 / 2;
+  border-radius: 0 0 12px 12px;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Heads-up display                                                           */
-/* -------------------------------------------------------------------------- */
-
+/* HUD ---------------------------------------------------------------------- */
 .hud {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  left: 0;
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  padding: 22px 28px;
+  z-index: 3;
+  display: grid;
+  grid-area: 1 / 1;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #73e7ff22;
   color: #dffbff;
-  letter-spacing: 0.1em;
-  pointer-events: none;
-  text-shadow: 0 0 12px #24d9ff;
-  text-transform: uppercase;
+  background: #071326;
+  border-radius: 12px 12px 0 0;
 }
 
 .hud-stat {
   display: grid;
-  gap: 2px;
+  gap: 4px;
 }
 
 .hud-stat--wave {
@@ -72,48 +67,67 @@ canvas {
 }
 
 .hud-label {
-  font-size: clamp(0.55rem, 1.4vw, 0.72rem);
-  opacity: 0.75;
+  color: #93acc8;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .hud strong {
-  font-size: clamp(0.85rem, 2vw, 1.2rem);
+  font-size: clamp(0.95rem, 2vw, 1.2rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Screens and typography                                                     */
-/* -------------------------------------------------------------------------- */
+#score {
+  color: var(--reward);
+}
 
+.hud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.best-badge {
+  color: var(--reward);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
+/* Overlays and typography -------------------------------------------------- */
 .overlay {
-  position: absolute;
-  inset: 0;
+  z-index: 2;
   display: grid;
+  grid-area: 2 / 1;
   align-content: center;
   justify-items: center;
-  padding: 5rem 1.5rem 2rem;
+  gap: 18px;
+  min-width: 0;
+  padding: 32px 24px;
+  border-radius: 0 0 12px 12px;
   text-align: center;
-  background: linear-gradient(#06112677, #030713dd);
-  /* Visibility changes immediately so newly shown resume/restart controls can take focus. */
-  transition: opacity 0.25s;
+  background: linear-gradient(#06112688, #030713ee);
 }
 
+/* Hidden grid layers must not contribute their content height to the game field. */
 .overlay.is-hidden {
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
-/* The wave notice keeps the game field visible while the simulation is safely frozen. */
+.best-badge.is-hidden {
+  visibility: hidden;
+}
+
 .overlay--notice {
-  z-index: 2;
   pointer-events: none;
   background: linear-gradient(#06112699, #030713aa);
 }
 
 .eyebrow {
-  margin: 0 0 0.8rem;
-  color: #73e7ff;
-  font-size: 0.72rem;
+  margin: 0;
+  color: var(--energy);
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.2em;
 }
@@ -123,34 +137,41 @@ h2 {
   margin: 0;
   color: #fff;
   font-style: italic;
-  line-height: 0.9;
+  line-height: 1.05;
   letter-spacing: 0.055em;
   text-shadow: 0 0 24px #2788ff;
 }
 
 h1 {
-  font-size: clamp(2.4rem, 9vw, 5.4rem);
+  font-size: clamp(2.3rem, 8vw, 5.4rem);
 }
 
 h1 span {
-  color: #ff4f7d;
+  color: #ff75ae;
 }
 
 h2 {
-  color: #ff668c;
-  font-size: clamp(2.4rem, 7vw, 4.3rem);
+  color: #ff88b8;
+  font-size: clamp(2rem, 7vw, 4.3rem);
+}
+
+.overlay--notice h2 {
+  color: var(--reward);
 }
 
 .lead {
-  margin: 1.1rem 0 1.8rem;
-  color: #c9d9ed;
+  max-width: 44ch;
+  margin: 0;
+  color: #d3e1f2;
+  line-height: 1.65;
+  text-wrap: balance;
 }
 
 .summary-list {
   display: grid;
-  gap: 0.55rem;
+  gap: 10px;
   width: min(370px, 100%);
-  margin: 1.2rem 0 1.8rem;
+  margin: 0;
   color: #c9d9ed;
   text-align: left;
 }
@@ -158,77 +179,73 @@ h2 {
 .summary-list div {
   display: flex;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: 16px;
 }
 
 .summary-list dt {
-  color: #93acc8;
-  font-size: 0.74rem;
+  color: #a4bad5;
+  font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .summary-list dd {
   margin: 0;
-  color: #fff;
+  color: var(--reward);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .controls {
-  margin: 1.65rem 0 0;
-  color: #93acc8;
-  font-size: clamp(0.62rem, 1.7vw, 0.78rem);
+  margin: 0;
+  color: #a4bad5;
+  font-size: 0.78rem;
+  line-height: 2.2;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Interactive controls                                                       */
-/* -------------------------------------------------------------------------- */
-
+/* Controls ----------------------------------------------------------------- */
 .action-button {
   min-width: 180px;
-  padding: 0.85rem 1.4rem;
-  border: 1px solid #73e7ff;
-  border-radius: 3px;
+  min-height: 48px;
+  padding: 12px 24px;
+  border: 1px solid var(--energy);
+  border-radius: 6px;
   color: #fff;
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   cursor: pointer;
-  background: #0e5d8e;
-  box-shadow: 0 0 18px #21bff788;
+  background: linear-gradient(#116a99, #0a4269);
+  box-shadow: 0 0 24px #21bff733;
   text-transform: uppercase;
-  transition: transform 0.15s, background 0.15s;
-}
-
-.action-button:hover,
-.action-button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-  background: #147ab6;
-  transform: translateY(-2px);
 }
 
 .hud-button {
-  padding: 0.35rem 0.55rem;
-  border: 1px solid #73e7ff99;
-  border-radius: 3px;
+  /* Reserve the same space for Pause/Resume and Sound on/off labels. */
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #73e7ff66;
+  border-radius: 6px;
   color: #dffbff;
   font-family: inherit;
-  font-size: clamp(0.55rem, 1.4vw, 0.72rem);
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  white-space: nowrap;
   cursor: pointer;
-  pointer-events: auto;
-  background: #061126b8;
-  text-transform: uppercase;
+  background: #0b2038;
 }
 
-.hud-button:hover,
-.hud-button:focus-visible {
-  border-color: #fff;
-  outline: 2px solid #fff;
-  outline-offset: 2px;
+.action-button:hover,
+.hud-button:hover {
+  background: #147ab6;
+}
+
+.hud-button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 kbd {
@@ -240,9 +257,12 @@ kbd {
   font-size: 0.9em;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Accessibility and preference overrides                                    */
-/* -------------------------------------------------------------------------- */
+/* Accessibility ------------------------------------------------------------ */
+button:focus-visible,
+canvas:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
 
 .sr-only {
   position: absolute;
@@ -256,57 +276,49 @@ kbd {
   border: 0;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Responsive layout                                                          */
-/* -------------------------------------------------------------------------- */
+/* Responsive and motion overrides ----------------------------------------- */
+@media (max-width: 600px) {
+  body {
+    padding: 12px;
+  }
 
-@media (max-width: 520px) {
   .hud {
-    padding: 15px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .game-shell {
+    /* Reserve menu space without stretching the 960 x 640 game coordinate system. */
+    grid-template-rows: auto minmax(380px, auto);
   }
 
   .hud-stat--hull {
-    max-width: 95px;
-    line-height: 1.15;
     text-align: right;
   }
 
-  /* Five summary rows and the restart control must fit inside the scaled game field. */
-  .overlay--summary {
-    padding: 2.9rem 1rem 0.35rem;
+  /* Controls get their own row so labels, focus rings and buttons never collide. */
+  .hud-actions {
+    grid-column: 1 / -1;
+    justify-content: center;
   }
 
-  .overlay--summary .eyebrow {
-    display: none;
+  .overlay {
+    gap: 16px;
+    min-height: 340px;
+    padding: 28px 16px;
   }
 
-  .overlay--summary h2 {
-    font-size: clamp(1.4rem, 6vw, 2.4rem);
+  .controls {
+    font-size: 0.7rem;
   }
 
   .summary-list {
-    gap: 0.12rem;
-    width: min(300px, 100%);
-    margin: 0.5rem 0;
-  }
-
-  .summary-list dt,
-  .summary-list dd {
-    font-size: 0.65rem;
-  }
-
-  .overlay--summary .action-button {
-    min-width: 150px;
-    padding: 0.45rem 1rem;
-    font-size: 0.75rem;
-  }
-
-  .overlay--summary .controls {
-    margin-top: 0.5rem;
+    gap: 8px;
   }
 }
 
-/* Avoid decorative movement and abrupt transitions for motion-sensitive players. */
+/* Keep gameplay warnings visible while removing decorative animation. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

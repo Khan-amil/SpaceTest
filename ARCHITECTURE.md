@@ -27,6 +27,8 @@ The game is intentionally arranged as ES modules with one responsibility each:
 | `src/input.js` | Keyboard-to-action adapter | Player movement logic |
 | `src/game.js` | Authoritative simulation, states, waves, events | DOM/canvas/audio |
 | `src/renderer.js` | Canvas drawing only | Collision or score rules |
+| `src/effects.js` | Fixed particle pool and presentation shake state | Gameplay mutations or DOM |
+| `src/audio.js` | Lazy Web Audio initialization and bounded event sounds | Simulation rules or DOM |
 | `src/main.js` | Browser composition, fixed timestep, UI sync | Gameplay rules |
 | `src/storage.js` | Failure-safe best-score and mute persistence adapter | Simulation or DOM wiring |
 
@@ -56,7 +58,7 @@ The game is intentionally arranged as ES modules with one responsibility each:
 
 ## Phase 1 lifecycle and validation
 
-`Game.start()` introduces Wave 1 for 1.25 simulation seconds before enabling play. When the last living enemy is removed, a 0.7-second clear notice awards the recipe's bonus, followed by the next wave's introduction. These timers advance through the fixed update loop without blocking browser rendering. Only the intro/clear timer advances during `WAVE_INTRO`; `PAUSED` advances nothing. A fatal hit takes precedence over advancing the wave.
+`Game.start()` introduces Wave 1 for 4 simulation seconds before enabling play. When the last living enemy is removed, a 3.5-second clear notice awards the recipe's bonus, followed by the next wave's introduction. These timers advance through the fixed update loop without blocking browser rendering. Only the intro/clear timer advances during `WAVE_INTRO`; `PAUSED` advances nothing. A fatal hit takes precedence over advancing the wave.
 
 `getWaveDefinition(number, seed)` selects authored difficulty bands and seeded late
 remixes while preserving the first 7×3 grid. Row defaults support column-specific
@@ -78,7 +80,7 @@ telegraphingDive → diving → returning → formation sequence. Phase 3 replac
 initial sine paths with cubic Béziers; return curves target the current moving slot.
 Dead enemies enter `exploding`,
 clear path data, and are collision-disabled immediately; the renderer currently
-removes them without an explosion lifetime, leaving particles to Phase 6.
+removes them immediately; the independent presentation pool handles explosion lifetimes.
 
 Waves 1–2 retain Scouts only and disable dives. Wave 3 adds a rear Wasp row; wave 5
 adds one rear Sentinel. Phase 4 recipes set cadence and reserve one diver at wave 3,
